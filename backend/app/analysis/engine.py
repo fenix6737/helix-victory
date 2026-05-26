@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from app.analysis.border_ev import border_ev_score
+from app.analysis.machine_borders import BorderSpec
 from app.analysis.island import compute_island_stats, enrich_island_column
 from app.config import settings
 from app.game_type import classify_game_type
@@ -212,23 +213,27 @@ def _exclusion_checks(
     return exclude, reasons
 
 
-def _build_positive_reasons(row: dict, store_mode: StoreMode) -> list[str]:
+def _build_positive_reasons(row: dict, store_mode: StoreMode, *, ev_mode: bool = True) -> list[str]:
     reasons: list[str] = []
-    if row.get("sunk_days", 0) >= 2:
-        reasons.append(f"・{int(row['sunk_days'])}日凹み後（放出期待）")
-    if row.get("is_corner2"):
-        reasons.append("・角2配置")
-    elif row.get("is_corner"):
-        reasons.append("・角配置")
+    if not ev_mode:
+        if row.get("sunk_days", 0) >= 2:
+            reasons.append(f"・{int(row['sunk_days'])}日凹み後（放出期待）")
+        if row.get("is_corner2"):
+            reasons.append("・角2配置")
+        elif row.get("is_corner"):
+            reasons.append("・角配置")
     if row.get("specific_day_match"):
         reasons.append("・特定日一致")
     if row.get("island_boost"):
         reasons.append("・島全体強化傾向")
     wf = row.get("waveform")
-    if wf == WaveformType.RIGHT_SHOULDER.value:
-        reasons.append("・右肩型波形")
-    elif wf == WaveformType.ONE_SHOT.value:
-        reasons.append("・一撃型波形")
+    if not ev_mode:
+        if wf == WaveformType.RIGHT_SHOULDER.value:
+            reasons.append("・右肩型波形")
+        elif wf == WaveformType.ONE_SHOT.value:
+            reasons.append("・一撃型波形")
+        elif wf == WaveformType.RELEASE.value:
+            reasons.append("・放出型波形")
     elif wf == WaveformType.RELEASE.value:
         reasons.append("・放出型波形")
     if store_mode == StoreMode.RELEASE:
@@ -246,6 +251,9 @@ def analyze_store(
     target_date: date,
     weights: LayerWeights | None = None,
     store_metadata: dict | None = None,
+    *,
+    ev_mode: bool = True,
+    border_specs: list[BorderSpec] | None = None,
 ) -> list[dict]:
     w = weights or LayerWeights()
     if df.empty:
@@ -324,14 +332,22 @@ def analyze_store(
         specific_day = 1.0 if target_dom in event_days or (target_dom % 10) in event_days or past_match > 0 else 0.0
         island_boost = float(island_row.get("island_release_signal", 0)) if island_row else 0.0
 
-        bev, bev_reasons = border_ev_score(
-            g, mn, str(latest.get("title") or ""), gtype_row, target_date, meta
+        bev, bev_reasons, rot_per_k, border_exceeded = border_ev_score(
+            g,
+            mn,
+            str(latest.get("title") or ""),
+            gtype_row,
+            target_date,
+            meta,
+            border_specs,
+            store_df=df,
+            island_id=str(island_id) if pd.notna(island_id) else None,
         )
-        ocult = settings.ocult_mode
+        use_ocult = not ev_mode
 
         # 加重スコア（モード別補正）
         score = 50.0
-        if ocult:
+        if use_ocult:
             score += min(sunk_days * 7, 21) * w.specific_day
             score += is_corner2 * 11 * w.position
             score += is_corner * 5 * w.position
@@ -349,18 +365,14 @@ def analyze_store(
             elif wf == WaveformType.DEATH:
                 score -= 25 * w.waveform
         else:
-            # オカルト OFF: 凹み・波形は最大 ~5% 相当、ボーダーEV・末尾・看板を主軸
-            score += min(sunk_days * 0.35, 1.0) * w.specific_day
-            score += is_corner2 * 4 * w.position
-            score += is_corner * 2 * w.position
-            score += island_boost * 5 * w.island
+            # 期待値モード: 凹み・角・右肩は完全0点
             score += specific_day * 10 * w.specific_day
             score += past_match * 6
-            score += bev * 22 * w.border_ev
+            score += bev * 28 * w.border_ev
+            if border_exceeded:
+                score += 12
             if wf == WaveformType.DEATH:
-                score -= 8 * w.waveform
-            elif wf in (WaveformType.RELEASE, WaveformType.RIGHT_SHOULDER):
-                score += 1.5 * w.waveform
+                score -= 10 * w.waveform
 
         if store_mode == StoreMode.RECOVERY:
             score -= 8
@@ -372,7 +384,7 @@ def analyze_store(
         score -= missing_rate * 35
         score -= hold_low * 12 * w.exclusion_penalty
         score -= long_neg * 2 * w.exclusion_penalty
-        if gtype_row == "pachinko":
+        if gtype_row == "pachinko" and use_ocult:
             score += 4
             if wf in (WaveformType.RELEASE, WaveformType.RIGHT_SHOULDER):
                 score += 3
@@ -401,8 +413,8 @@ def analyze_store(
         excluded, ex_reasons = _exclusion_checks(
             row, store_mode, island_row, gtype_row, min_samples=min_n
         )
-        pos_reasons = _build_positive_reasons(row, store_mode)
-        if not ocult and bev_reasons:
+        pos_reasons = _build_positive_reasons(row, store_mode, ev_mode=ev_mode)
+        if ev_mode and bev_reasons:
             pos_reasons = (bev_reasons + pos_reasons)[:6]
         rec_min = settings.score_recommend_min - (4 if gtype_row == "pachinko" else 0)
 
@@ -433,6 +445,8 @@ def analyze_store(
                 "machine_id": int(machine_id),
                 "score": round(score, 1),
                 "border_ev": round(bev, 3),
+                "rot_per_1000_yen": round(rot_per_k, 2) if rot_per_k is not None else None,
+                "border_exceeded": border_exceeded,
                 "tier": tier.value,
                 "reasons": reasons[:6],
                 "sample_count": row["sample_count"],
@@ -449,9 +463,14 @@ def analyze_store(
     def _tier_slice(game_type: str, n_rec: int = 20, n_hold: int = 15, n_ex: int = 30) -> list[dict]:
         subset = [r for r in results if r.get("game_type") == game_type]
         def _sort_key(x: dict) -> tuple:
-            if settings.ocult_mode:
+            if not ev_mode:
                 return (x["score"], x.get("border_ev", 0))
-            return (x.get("border_ev", 0), x["score"])
+            return (
+                1 if x.get("border_exceeded") else 0,
+                x.get("rot_per_1000_yen") or 0,
+                x.get("border_ev", 0),
+                x["score"],
+            )
 
         recs = sorted(
             [r for r in subset if r["tier"] == VerdictTier.RECOMMEND.value],

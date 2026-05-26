@@ -170,6 +170,30 @@ class DailyPredictionReport(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class MachineBorder(Base):
+    """機種別等価ボーダー（1,000円あたりの合格回転数）"""
+
+    __tablename__ = "m_machine_borders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title_pattern: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    border_per_1000_yen: Mapped[float] = mapped_column(Float, nullable=False)
+    game_type: Mapped[str] = mapped_column(String(16), default="pachinko")
+    coin_price_yen: Mapped[float] = mapped_column(Float, default=4.0)
+    base_games: Mapped[int] = mapped_column(Integer, default=400)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class StoreAnalysisSettings(Base):
+    """店舗別 — 期待値モード（オカルト排除）トグル"""
+
+    __tablename__ = "store_analysis_settings"
+
+    store_id: Mapped[str] = mapped_column(String(32), ForeignKey("stores.id"), primary_key=True)
+    ev_mode: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class PlayRecord(Base):
     """ユーザー自身のプレイ記録（自己検証用）"""
 

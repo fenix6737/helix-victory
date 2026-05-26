@@ -27,6 +27,10 @@ from app.schemas import (
     StoreLiveStatusOut,
     TodayRecommendationsOut,
     PerformanceDashboardOut,
+    AnalysisSettingsOut,
+    AnalysisSettingsIn,
+    MachineBorderOut,
+    MachineBorderImportIn,
     StoreExtrasOut,
     PlayRecordIn,
     PlayRecordOut,
@@ -148,6 +152,68 @@ async def get_store_performance(
 ):
     data = await performance_stats.get_performance_dashboard(db, store_id, game_type)
     return PerformanceDashboardOut(**data)
+
+
+@router.get("/stores/{store_id}/analysis-settings", response_model=AnalysisSettingsOut)
+async def get_analysis_settings(
+    store_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    from app.services import analysis_settings
+
+    return AnalysisSettingsOut(**await analysis_settings.get_settings_payload(db, store_id))
+
+
+@router.patch("/stores/{store_id}/analysis-settings", response_model=AnalysisSettingsOut)
+async def patch_analysis_settings(
+    store_id: str,
+    body: AnalysisSettingsIn,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    from app.services import analysis_settings
+
+    await analysis_settings.set_ev_mode(db, store_id, body.ev_mode)
+    return AnalysisSettingsOut(**await analysis_settings.get_settings_payload(db, store_id))
+
+
+@router.get("/machine-borders", response_model=list[MachineBorderOut])
+async def list_machine_borders(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    from app.models import MachineBorder
+    from sqlalchemy import select
+
+    rows = (await db.execute(select(MachineBorder).order_by(MachineBorder.title_pattern))).scalars().all()
+    return [
+        MachineBorderOut(
+            id=r.id,
+            title_pattern=r.title_pattern,
+            border_per_1000_yen=r.border_per_1000_yen,
+            game_type=r.game_type,
+            coin_price_yen=r.coin_price_yen,
+            base_games=r.base_games,
+        )
+        for r in rows
+    ]
+
+
+@router.post("/machine-borders/import")
+async def import_machine_borders(
+    body: MachineBorderImportIn,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    from app.services import machine_border_service
+
+    try:
+        return await machine_border_service.import_borders_csv(
+            db, body.csv_text, replace=body.replace
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @router.get("/stores/{store_id}/extras", response_model=StoreExtrasOut)

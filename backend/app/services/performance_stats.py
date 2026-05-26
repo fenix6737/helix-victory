@@ -106,8 +106,10 @@ async def get_performance_dashboard(
     game_type: str = "all",
 ) -> dict:
     from app.analysis.feedback import adjust_weights, record_outcomes
+    from app.services.analysis_settings import get_ev_mode
 
     today = jst_today()
+    ev_mode = await get_ev_mode(db, store_id)
     recorded = await record_outcomes(db, store_id, today)
     await adjust_weights(db, store_id)
     since_7 = today - timedelta(days=7)
@@ -161,4 +163,6 @@ async def get_performance_dashboard(
             "outcomes_total": int(outcome_total.scalar() or 0),
         },
         "disclaimer": "勝利保証ではありません。データが溜まるほど％の信頼度が上がります。",
+        "target_plus_rate_pct": 55.0,
+        "ev_mode": ev_mode,
     }

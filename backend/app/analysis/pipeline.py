@@ -98,7 +98,14 @@ async def run_analysis(
     meta_row = await db.get(StoreMetadata, store_id)
     store_meta = json.loads(meta_row.metadata_json) if meta_row else {}
     integrity = audit_data_integrity(df, store_id)
-    scored = analyze_store(df, store_id, target, weights, store_meta)
+    from app.services.analysis_settings import get_ev_mode
+    from app.services.machine_border_service import list_borders
+
+    ev_mode = await get_ev_mode(db, store_id)
+    borders = await list_borders(db)
+    scored = analyze_store(
+        df, store_id, target, weights, store_meta, ev_mode=ev_mode, border_specs=borders
+    )
     anomaly = detect_anomalies(scored, df, integrity)
     if anomaly.get("block_recommendations"):
         for s in scored:
@@ -214,6 +221,20 @@ async def migrate_schema(engine) -> None:
             generated_at TIMESTAMP,
             UNIQUE(store_id, target_date)
         )""",
+        """CREATE TABLE IF NOT EXISTS m_machine_borders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title_pattern VARCHAR(128) NOT NULL,
+            border_per_1000_yen REAL NOT NULL,
+            game_type VARCHAR(16) DEFAULT 'pachinko',
+            coin_price_yen REAL DEFAULT 4.0,
+            base_games INTEGER DEFAULT 400,
+            updated_at TIMESTAMP
+        )""",
+        """CREATE TABLE IF NOT EXISTS store_analysis_settings (
+            store_id VARCHAR(32) PRIMARY KEY,
+            ev_mode BOOLEAN DEFAULT 1,
+            updated_at TIMESTAMP
+        )""",
     ]
     if engine.dialect.name == "sqlite":
         async with engine.begin() as conn:
@@ -268,6 +289,20 @@ async def migrate_schema(engine) -> None:
             data_sources_json TEXT,
             generated_at TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(store_id, target_date)
+        )""",
+        """CREATE TABLE IF NOT EXISTS m_machine_borders (
+            id SERIAL PRIMARY KEY,
+            title_pattern VARCHAR(128) NOT NULL,
+            border_per_1000_yen DOUBLE PRECISION NOT NULL,
+            game_type VARCHAR(16) DEFAULT 'pachinko',
+            coin_price_yen DOUBLE PRECISION DEFAULT 4.0,
+            base_games INTEGER DEFAULT 400,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS store_analysis_settings (
+            store_id VARCHAR(32) PRIMARY KEY REFERENCES stores(id),
+            ev_mode BOOLEAN DEFAULT TRUE,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
         )""",
     ]
     async with engine.begin() as conn:

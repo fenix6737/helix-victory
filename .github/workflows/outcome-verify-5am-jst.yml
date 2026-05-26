@@ -1,0 +1,53 @@
+# ガチ期待値 §⑤ — 毎日 AM 5:00 JST 推奨照合バッチ
+name: Outcome Verify 5AM JST
+
+on:
+  schedule:
+    # 05:00 JST = 20:00 UTC（前日）
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: outcome-verify-5am
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify secrets
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          test -n "$HELIX_API_URL" || exit 1
+          test -n "$ADMIN_USERNAME" || exit 1
+          test -n "$ADMIN_PASSWORD" || exit 1
+
+      - name: Login (retry)
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: bash .github/scripts/helix-auth.sh
+
+      - name: Reconcile + daily learning cycle
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+        run: |
+          set -euo pipefail
+          url="${HELIX_API_URL%/}"
+          for SID in kicona_amagasaki maruhan_umeda; do
+            echo "=== 5AM reconcile $SID ==="
+            curl -sf "$url/api/v1/stores/$SID/performance?game_type=all" \
+              -H "Authorization: Bearer $HELIX_TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print('reconcile', d.get('last_reconcile_count'), '7d_rate', d.get('recommend',{}).get('days_7',{}).get('plus_rate_pct'))"
+            curl -sf -X POST "$url/api/v1/analysis/daily-learning-cycle" \
+              -H "Authorization: Bearer $HELIX_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"store_id\":\"$SID\"}" | head -c 200
+            echo ""
+          done

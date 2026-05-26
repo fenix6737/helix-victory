@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     score_recommend_min: float = 68.0  # env: SCORE_RECOMMEND_MIN
     score_hold_min: float = 42.0  # env: SCORE_HOLD_MIN
 
-    # 1=凹み・波形重視（旧） / 0=確率論・ボーダー重視（信頼性極大化デフォルト）
+    # 1=凹み・角・波形重視（旧） / 0=期待値モード（デフォルト・オカルト排除）
     ocult_mode: bool = False  # env: OCULT_MODE=1 で旧ロジック
 
     cache_ttl_ranking: int = 60

@@ -1,66 +1,27 @@
 """
-ボーダー・回転率ベースの期待値補正（信頼性極大化 §②）
-差枚だけでなく回転数・BB/RB から「打てば期待値が上がる台」を推定する。
+ガチ期待値 — ボーダー・回転率逆算・店舗クセ
 """
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 
+from app.analysis.hall_habits import compute_hall_habit_scores
+from app.analysis.machine_borders import (
+    BorderSpec,
+    border_exceed_score,
+    estimate_rotation_per_1000_yen,
+    match_border,
+)
 from app.featured import classify_featured
 
-# スロット: 250G あたりの回転数が高いほど設定が高い想定（店舗・機種で調整可能）
-SLOT_ROT_PER_250_TARGET = 28.0
-SLOT_BORDER_MIN = 24.0
-PACHI_BB_PER_1000G_TARGET = 4.5
+DEFAULT_SLOT_BORDER = 21.0
+DEFAULT_PACHI_BORDER = 16.5
 
 
-def tail_digit_strength(machine_number: int, weekday: int) -> float:
-    """末尾番号・曜日の簡易強さ（0〜1）— ホールクセの代理指標"""
-    tail = machine_number % 10
-    hot_tails = {1, 3, 5, 7, 9}
-    score = 0.35 if tail in hot_tails else 0.1
-    if weekday in (2, 5):  # 水・土
-        score += 0.15
-    return min(1.0, score)
-
-
-def estimate_rotation_per_250(g: pd.DataFrame) -> float | None:
-    """250枚/G あたり回転の推定（rotation_count または final_games から）"""
-    rot = g["rotation_count"].dropna() if "rotation_count" in g.columns else pd.Series(dtype=float)
-    if rot.notna().any() and rot.mean() > 0:
-        # rotation_count が「総回転」想定
-        fg = g["final_games"].dropna()
-        if fg.notna().any() and fg.mean() > 0:
-            return float(rot.mean() / max(fg.mean(), 1) * 250)
-        return float(rot.mean() / 250)
-
-    fg = g["final_games"].dropna()
-    if fg.notna().any() and fg.mean() >= 100:
-        # G数のみ: 粗い代理（低G=高回転の逆は取れないが傾向用）
-        return float(25000 / max(fg.mean(), 100))
-    return None
-
-
-def estimate_pachinko_hit_density(g: pd.DataFrame) -> float | None:
-    """パチンコ: BB+RB 合計 / 1000G 相当"""
-    bb = g["big_count"].dropna() if "big_count" in g.columns else pd.Series(dtype=float)
-    rb = g["reg_count"].dropna() if "reg_count" in g.columns else pd.Series(dtype=float)
-    fg = g["final_games"].dropna() if "final_games" in g.columns else pd.Series(dtype=float)
-    if not bb.notna().any() and not rb.notna().any():
-        return None
-    hits = float((bb.fillna(0) + rb.fillna(0)).mean())
-    games = float(fg.mean()) if fg.notna().any() and fg.mean() > 0 else 1000.0
-    return hits / max(games / 1000, 0.1)
-
-
-def inverse_invest_score(g: pd.DataFrame, target_date: date) -> float:
-    """
-    差枚推移から投資の逆算（粗い）— ボーダー超えで出ているほど高スコア。
-    前日比で差枚が改善しつつ回転が取れている台を評価。
-    """
+def _diff_trend(g: pd.DataFrame) -> float:
     daily = (
         g.groupby(g["captured_at"].dt.date)["diff_coins"]
         .last()
@@ -69,16 +30,7 @@ def inverse_invest_score(g: pd.DataFrame, target_date: date) -> float:
     )
     if len(daily) < 2:
         return 0.0
-    recent = daily.iloc[-3:]
-    trend = float(recent.iloc[-1] - recent.iloc[0])
-    # マイナスからプラス方向、またはプラス維持
-    if trend > 500:
-        return 0.9
-    if trend > 0:
-        return 0.55
-    if trend > -800:
-        return 0.25
-    return 0.0
+    return float(daily.iloc[-1] - daily.iloc[0])
 
 
 def border_ev_score(
@@ -88,42 +40,60 @@ def border_ev_score(
     game_type: str,
     target_date: date,
     store_metadata: dict | None,
-) -> tuple[float, list[str]]:
+    border_specs: list[BorderSpec] | None,
+    store_df: pd.DataFrame | None = None,
+    island_id: str | None = None,
+) -> tuple[float, list[str], float | None, bool]:
     """
-    0〜1 の期待値スコアと理由タグ。
+    Returns: score 0-1, reasons, rot_per_1000_yen, border_exceeded (+1回転以上)
     """
     reasons: list[str] = []
     meta = store_metadata or {}
+    specs = border_specs or []
     score = 0.0
+    rot_per_k: float | None = None
+    exceeded = False
 
-    rot250 = estimate_rotation_per_250(g)
-    if game_type == "slot" and rot250 is not None:
-        if rot250 >= SLOT_BORDER_MIN:
-            ratio = min(1.0, rot250 / SLOT_ROT_PER_250_TARGET)
-            score += 0.45 * ratio
-            reasons.append(f"・推定回転{rot250:.0f}/250G（ボーダー超え）")
-        elif rot250 >= SLOT_BORDER_MIN - 3:
-            score += 0.2
-            reasons.append("・回転率やや高め")
+    spec = match_border(title, specs)
+    border_k = spec.border_per_1000_yen if spec else (
+        DEFAULT_PACHI_BORDER if game_type == "pachinko" else DEFAULT_SLOT_BORDER
+    )
 
-    if game_type == "pachinko":
-        hd = estimate_pachinko_hit_density(g)
-        if hd is not None:
-            ratio = min(1.0, hd / PACHI_BB_PER_1000G_TARGET)
-            score += 0.4 * ratio
-            reasons.append(f"・大当たり密度{hd:.2f}/1000G")
+    rot_series = g["rotation_count"].dropna() if "rotation_count" in g.columns else pd.Series(dtype=float)
+    fg_series = g["final_games"].dropna() if "final_games" in g.columns else pd.Series(dtype=float)
+    total_rot = float(rot_series.mean()) if rot_series.notna().any() else None
+    fg_mean = float(fg_series.mean()) if fg_series.notna().any() else None
 
-    score += 0.25 * inverse_invest_score(g, target_date)
-    score += 0.2 * tail_digit_strength(machine_number, target_date.weekday())
+    if spec and total_rot:
+        trend = _diff_trend(g)
+        rot_per_k, invest = estimate_rotation_per_1000_yen(total_rot, fg_mean, spec, trend)
+        if rot_per_k is not None:
+            part, exceeded = border_exceed_score(rot_per_k, border_k, margin=1.0)
+            score += 0.55 * part
+            reasons.append(
+                f"・推定{rot_per_k:.1f}回/k（ボーダー{border_k:.1f}）"
+                + (" ★超え" if exceeded else "")
+            )
+    elif game_type == "slot" and fg_mean and fg_mean >= 100:
+        rot_per_k = 25000.0 / max(fg_mean, 100) * (1000 / 250)
+        part, exceeded = border_exceed_score(rot_per_k / 4, border_k, margin=1.0)
+        score += 0.35 * part
 
-    feat, gid, _ = classify_featured(title)
+    habit_df = store_df if store_df is not None else g
+    habit, habit_reasons = compute_hall_habit_scores(
+        habit_df,
+        "",
+        machine_number,
+        island_id,
+        target_date,
+        meta.get("event_days") or [3, 9],
+    )
+    score += 0.35 * habit
+    reasons.extend(habit_reasons)
+
+    feat, _, _ = classify_featured(title)
     if feat:
-        score += 0.15
-        reasons.append("・看板機種（注目枠）")
-
-    event_days = meta.get("event_days") or [3, 9]
-    if target_date.day in event_days or (target_date.day % 10) in event_days:
         score += 0.1
-        reasons.append("・イベント日末尾")
+        reasons.append("・看板機種")
 
-    return min(1.0, score), reasons
+    return min(1.0, score), reasons[:5], rot_per_k, exceeded

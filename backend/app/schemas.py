@@ -197,6 +197,32 @@ class PerformanceDashboardOut(BaseModel):
     hold: dict
     operations: PerformanceOperations
     disclaimer: str
+    target_plus_rate_pct: float = 55.0
+    ev_mode: bool = True
+
+
+class AnalysisSettingsOut(BaseModel):
+    store_id: str
+    ev_mode: bool
+    ev_mode_label: str
+
+
+class AnalysisSettingsIn(BaseModel):
+    ev_mode: bool
+
+
+class MachineBorderOut(BaseModel):
+    id: int
+    title_pattern: str
+    border_per_1000_yen: float
+    game_type: str
+    coin_price_yen: float
+    base_games: int
+
+
+class MachineBorderImportIn(BaseModel):
+    csv_text: str
+    replace: bool = False
 
 
 class CollectorHealthOut(BaseModel):

@@ -29,6 +29,9 @@ async def lifespan(app: FastAPI):
             if not existing:
                 db.add(Store(id=store_id, name=name, is_active=True))
         await db.commit()
+        from app.services.machine_border_service import seed_default_borders
+
+        await seed_default_borders(db)
 
     yield
     await engine.dispose()

@@ -6,7 +6,9 @@ import { BudgetControl } from "@/components/BudgetControl";
 import { CombatPanel } from "@/components/CombatPanel";
 import { LiveActivityBar } from "@/components/LiveActivityBar";
 import { FeaturedMachinesSection } from "@/components/FeaturedMachinesSection";
+import { EvModeToggle } from "@/components/EvModeToggle";
 import { PerformanceDashboard } from "@/components/PerformanceDashboard";
+import { RecommendAccuracyPanel } from "@/components/RecommendAccuracyPanel";
 import { PeriodStatsPanel } from "@/components/PeriodStatsPanel";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { StoreFeaturesPanel } from "@/components/StoreFeaturesPanel";
@@ -407,6 +409,10 @@ export function HomeClient({
         stale={usingCache || offline}
         gameKind={gameKind}
       />
+
+      <EvModeToggle storeId={storeId} />
+
+      <RecommendAccuracyPanel storeId={storeId} gameKind={gameKind} refreshKey={perfTick} />
 
       <PerformanceDashboard storeId={storeId} gameKind={gameKind} refreshKey={perfTick} />
 
