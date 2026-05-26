@@ -12,22 +12,48 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Verify secrets
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          test -n "$HELIX_API_URL" || { echo "Missing secret: HELIX_API_URL"; exit 1; }
+          test -n "$ADMIN_USERNAME" || { echo "Missing secret: ADMIN_USERNAME"; exit 1; }
+          test -n "$ADMIN_PASSWORD" || { echo "Missing secret: ADMIN_PASSWORD"; exit 1; }
+          echo "Secrets OK"
+
       - name: Daily learning cycle (all stores)
         env:
           HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          set -e
-          TOKEN=$(curl -sf -X POST "$HELIX_API_URL/api/v1/auth/login" \
+          set -euo pipefail
+          login_body=$(curl -sS -w "\n%{http_code}" -X POST "$HELIX_API_URL/api/v1/auth/login" \
             -H "Content-Type: application/json" \
-            -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+            -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}")
+          login_http=$(echo "$login_body" | tail -n1)
+          login_json=$(echo "$login_body" | sed '$d')
+          if [ "$login_http" != "200" ]; then
+            echo "Login failed HTTP $login_http — run scripts/sync-github-secrets.ps1 after Fly deploy"
+            echo "$login_json" | head -c 200
+            exit 1
+          fi
+          TOKEN=$(echo "$login_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
           for SID in kicona_amagasaki maruhan_umeda; do
             echo "=== daily-learning-cycle $SID ==="
-            curl -sf -X POST "$HELIX_API_URL/api/v1/analysis/daily-learning-cycle" \
+            cycle_body=$(curl -sS -w "\n%{http_code}" -X POST "$HELIX_API_URL/api/v1/analysis/daily-learning-cycle" \
               -H "Authorization: Bearer $TOKEN" \
               -H "Content-Type: application/json" \
-              -d "{\"store_id\":\"$SID\"}"
+              -d "{\"store_id\":\"$SID\"}")
+            cycle_http=$(echo "$cycle_body" | tail -n1)
+            cycle_json=$(echo "$cycle_body" | sed '$d')
+            if [ "$cycle_http" != "200" ]; then
+              echo "daily-learning-cycle HTTP $cycle_http for $SID"
+              echo "$cycle_json" | head -c 300
+              exit 1
+            fi
+            echo "$cycle_json" | head -c 300
             echo ""
           done

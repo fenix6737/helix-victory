@@ -52,6 +52,10 @@ async def main() -> int:
             continue
         result = await post_logs(api, sid, logs)
         print(f"  ingest: {result}")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            print("  ingest 401 Unauthorized — INGEST_API_KEY mismatch. Run scripts/sync-github-secrets.ps1")
+        raise
 
     user = os.getenv("ADMIN_USERNAME", "helix_admin")
     pw = os.getenv("ADMIN_PASSWORD", "")

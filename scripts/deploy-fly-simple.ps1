@@ -84,15 +84,28 @@ if ($apps -notmatch [regex]::Escape($AppName)) {
 
 $volList = Get-FlyOutput volumes list -a $AppName
 if ($volList -notmatch "helix_data") {
-    Write-Host "繝・・繧ｿ逕ｨ繝懊Μ繝･繝ｼ繝菴懈・ (SQLite)..." -ForegroundColor Cyan
+    Write-Host "Creating volume helix_data (SQLite)..." -ForegroundColor Cyan
     Invoke-Fly volumes create helix_data -a $AppName -r $Region --size 1 -y
 }
 
-$adminPass = New-Secret
-$jwt = (New-Secret) + (New-Secret)
-$ingest = New-Secret
+$credFile = Join-Path $Root "deploy\fly-deployed.local.env"
+$adminPass = $null
+$jwt = $null
+$ingest = $null
+if (Test-Path $credFile) {
+    $vars = @{}
+    Get-Content $credFile -Encoding UTF8 | ForEach-Object {
+        if ($_ -match '^([^#=]+)=(.*)$') { $vars[$matches[1].Trim()] = $matches[2].Trim() }
+    }
+    $adminPass = $vars["ADMIN_PASSWORD"]
+    $ingest = $vars["INGEST_API_KEY"]
+    $jwt = $vars["JWT_SECRET"]
+}
+if (-not $adminPass) { $adminPass = New-Secret }
+if (-not $jwt) { $jwt = (New-Secret) + (New-Secret) }
+if (-not $ingest) { $ingest = New-Secret }
 
-Write-Host "繧ｷ繝ｼ繧ｯ繝ｬ繝・ヨ險ｭ螳・.." -ForegroundColor Cyan
+Write-Host "Setting Fly secrets (existing creds preserved when present)..." -ForegroundColor Cyan
 Invoke-Fly secrets set `
     DATABASE_URL="sqlite+aiosqlite:////data/helix.db" `
     ADMIN_USERNAME="helix_admin" `
@@ -103,7 +116,6 @@ Invoke-Fly secrets set `
     PUBLIC_ACCESS="1" `
     -a $AppName
 
-$credFile = Join-Path $Root "deploy\fly-deployed.local.env"
 @(
     "# auto-generated - do not commit",
     "HELIX_PUBLIC_URL=$publicUrl",
@@ -112,6 +124,13 @@ $credFile = Join-Path $Root "deploy\fly-deployed.local.env"
     "INGEST_API_KEY=$ingest",
     "JWT_SECRET=$jwt"
 ) | Set-Content -Path $credFile -Encoding UTF8
+
+# GitHub Actions secrets must match Fly — sync after deploy
+$syncScript = Join-Path $Root "scripts\sync-github-secrets.ps1"
+if (Test-Path $syncScript) {
+    Write-Host "Syncing GitHub Actions secrets..." -ForegroundColor Cyan
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript
+}
 
 if (-not $SkipDeploy) {
     Write-Host "繝・・繝ｭ繧､荳ｭ・域焚蛻・ｼ・.." -ForegroundColor Cyan
