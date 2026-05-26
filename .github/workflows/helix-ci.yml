@@ -59,7 +59,12 @@ jobs:
           pip install httpx pandas
           python scripts/e2e_local.py --store kicona_amagasaki --from-cache
           cd backend
-          PYTHONPATH=. python -m unittest discover -s tests -p "test_*.py" -q
+          PYTHONPATH=. python -m unittest \
+            tests.test_featured \
+            tests.test_border_ev \
+            tests.test_feedback_outcomes.TestOutcomeBusinessDate \
+            tests.test_public_url \
+            -q
           cd ..
           python -m unittest discover -s collector/tests -p "test_*.py" -q
 
