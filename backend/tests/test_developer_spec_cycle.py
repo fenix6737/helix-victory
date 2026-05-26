@@ -11,6 +11,15 @@ os.environ.setdefault(
 
 
 class DeveloperSpecDailyCycle(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        import asyncio
+
+        from app.analysis.pipeline import migrate_schema
+        from app.db import engine
+
+        asyncio.run(migrate_schema(engine))
+
     async def test_daily_learning_cycle_runs(self):
         from app.db import async_session
         from app.services.daily_cycle import run_daily_learning_cycle

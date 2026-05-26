@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from app.analysis.border_ev import border_ev_score
+from app.analysis.hall_habits import build_hall_habit_cache
 from app.analysis.machine_borders import BorderSpec
 from app.analysis.island import compute_island_stats, enrich_island_column
 from app.config import settings
@@ -270,6 +271,7 @@ def analyze_store(
     store_mode = detect_store_mode(df, target_date, event_days)
     island_stats = compute_island_stats(df, target_date)
     island_map = {r["island_id"]: r for r in island_stats.to_dict("records")} if not island_stats.empty else {}
+    habit_cache = build_hall_habit_cache(df, target_date, event_days)
 
     min_samples_slot = _store_min_samples(store_id, df, "slot")
     min_samples_pachi = _store_min_samples(store_id, df, "pachinko")
@@ -340,7 +342,7 @@ def analyze_store(
             target_date,
             meta,
             border_specs,
-            store_df=df,
+            habit_cache=habit_cache,
             island_id=str(island_id) if pd.notna(island_id) else None,
         )
         use_ocult = not ev_mode

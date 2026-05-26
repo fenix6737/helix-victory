@@ -48,7 +48,7 @@ class TestBorderEv(unittest.TestCase):
         )
         specs = [BorderSpec("ジャグラー", 22.0, "slot", 20.0, 250)]
         score, reasons, rot_k, exceeded = border_ev_score(
-            g, 101, "マイジャグラーV", "slot", date(2026, 5, 20), {}, specs, store_df=g
+            g, 101, "マイジャグラーV", "slot", date(2026, 5, 20), {}, specs
         )
         self.assertGreater(score, 0.1)
         self.assertTrue(reasons)

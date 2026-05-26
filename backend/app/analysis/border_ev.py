@@ -8,7 +8,7 @@ from datetime import date
 
 import pandas as pd
 
-from app.analysis.hall_habits import compute_hall_habit_scores
+from app.analysis.hall_habits import HallHabitCache, lookup_hall_habit_scores
 from app.analysis.machine_borders import (
     BorderSpec,
     border_exceed_score,
@@ -41,7 +41,7 @@ def border_ev_score(
     target_date: date,
     store_metadata: dict | None,
     border_specs: list[BorderSpec] | None,
-    store_df: pd.DataFrame | None = None,
+    habit_cache: HallHabitCache | None = None,
     island_id: str | None = None,
 ) -> tuple[float, list[str], float | None, bool]:
     """
@@ -79,14 +79,8 @@ def border_ev_score(
         part, exceeded = border_exceed_score(rot_per_k / 4, border_k, margin=1.0)
         score += 0.35 * part
 
-    habit_df = store_df if store_df is not None else g
-    habit, habit_reasons = compute_hall_habit_scores(
-        habit_df,
-        "",
-        machine_number,
-        island_id,
-        target_date,
-        meta.get("event_days") or [3, 9],
+    habit, habit_reasons = lookup_hall_habit_scores(
+        habit_cache, machine_number, island_id
     )
     score += 0.35 * habit
     reasons.extend(habit_reasons)

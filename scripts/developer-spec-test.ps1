@@ -172,7 +172,7 @@ if (-not $SkipLiveApi) {
         $cycleBody = Join-Path $Root "data\devspec-cycle.json"
         [System.IO.File]::WriteAllText($cycleBody, (@{ store_id = $StoreId } | ConvertTo-Json -Compress), $utf8NoBom)
         $ccFile = Join-Path $Root "data\devspec-cycle-http.txt"
-        curl.exe -s -o (Join-Path $Root "data\devspec-cycle-out.json") -w "%{http_code}" -X POST "$ApiUrl/api/v1/analysis/daily-learning-cycle" `
+        curl.exe -s --max-time 180 -o (Join-Path $Root "data\devspec-cycle-out.json") -w "%{http_code}" -X POST "$ApiUrl/api/v1/analysis/daily-learning-cycle" `
             -H "Authorization: Bearer $tok" -H "Content-Type: application/json" --data-binary "@$cycleBody" | Set-Content $ccFile -Encoding ASCII -NoNewline
         $cc = (Get-Content $ccFile -Raw).Trim()
         Check "§2 daily-learning-cycle POST" ($cc -eq "200") "HTTP $cc"
