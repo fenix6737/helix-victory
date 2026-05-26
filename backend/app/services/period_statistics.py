@@ -9,7 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.featured import classify_featured
 from app.models import Machine, PredictionOutcome, RawLog, Recommendation
-from app.timeutil import jst_day_bounds_utc, jst_today
+from app.timeutil import JST, analysis_target_date, jst_day_bounds_utc, jst_today
+
+
+async def _latest_log_day_jst(db: AsyncSession, store_id: str) -> date | None:
+    """取り込みログの最新日（JST）。captured_at はスクレイプ日付基準のため今日0件時に使用。"""
+    row = await db.execute(
+        select(func.max(RawLog.captured_at)).where(RawLog.store_id == store_id)
+    )
+    ts = row.scalar()
+    if not ts:
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(JST).date()
 
 
 async def _machines_active_today(
@@ -87,11 +100,18 @@ async def get_daily_statistics(
 ) -> dict:
     day = target_date or jst_today()
     machines = await _machines_active_today(db, store_id, day)
-    pred = await _prediction_stats(db, store_id, day, day)
+    if not machines and not target_date:
+        latest = await _latest_log_day_jst(db, store_id)
+        if latest:
+            day = latest
+            machines = await _machines_active_today(db, store_id, day)
 
+    pred = await _prediction_stats(db, store_id, jst_today(), jst_today())
+
+    rec_target = target_date or analysis_target_date()
     rec_stmt = select(func.count(Recommendation.id)).where(
         Recommendation.store_id == store_id,
-        Recommendation.target_date == day,
+        Recommendation.target_date == rec_target,
         Recommendation.tier == "recommend",
     )
     rec_count = int((await db.execute(rec_stmt)).scalar() or 0)
