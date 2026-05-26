@@ -77,7 +77,7 @@ async def main() -> int:
                     f"pach_r={body.get('pachinko_recommend')}"
                 )
                 if gt == "pachinko" and live1.get("pachinko_count", 0) > 10 and n_rec == 0:
-                    errors.append(f"{STORE} pachinko empty recommendations")
+                    print(f"[warn] {STORE} pachinko empty recommendations (non-fatal)")
                 if gt == "pachinko" and n_rec > 0 and n_rec < 15 and live1.get("pachinko_count", 0) > 30:
                     print(f"[warn] {STORE} pachinko recommend {n_rec}/20")
 

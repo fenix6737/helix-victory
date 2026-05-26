@@ -48,6 +48,8 @@ $required = @(
     ".github\workflows\cloud-collect.yml",
     ".github\workflows\midnight-jst-daily-cycle.yml",
     ".github\workflows\outcome-verify-jst.yml",
+    ".github\workflows\secrets-health-check.yml",
+    ".github\scripts\helix-auth.sh",
     "backend\app\analysis\border_ev.py",
     "backend\app\timeutil.py",
     "docs\DEVELOPER_SPEC.md"
@@ -72,6 +74,8 @@ Check "§1 anaslo.com" ($anasloSrc -match "ana-slo\.com")
 Check "§1 min-repo tag" ($minrepoSrc -match "min-repo\.com/tag")
 Check "§1 data_sources metadata" ($kiconaSrc -match "data_sources")
 Check "§1 realtime daemon" (Test-Path (Join-Path $Root "collector\collector\daemon.py"))
+Check "§1 sync-github-secrets" (Test-Path (Join-Path $Root "scripts\sync-github-secrets.ps1"))
+Check "§1 helix-auth retry script" (Test-Path (Join-Path $Root ".github\scripts\helix-auth.sh"))
 
 $engineSrc = Get-Content (Join-Path $Root "backend\app\analysis\engine.py") -Raw -ErrorAction SilentlyContinue
 $feedbackSrc = Get-Content (Join-Path $Root "backend\app\analysis\feedback.py") -Raw -ErrorAction SilentlyContinue

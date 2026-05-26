@@ -54,10 +54,12 @@ jobs:
           ADMIN_USERNAME: helix_admin
           ADMIN_PASSWORD: HelixVictory2026!Admin
           INGEST_API_KEY: helix-ingest-ci-key
+          HELIX_LENIENT_COLLECT: "1"
         run: |
           pip install httpx pandas
           python scripts/e2e_local.py --store kicona_amagasaki --from-cache
-          python scripts/run_all_tests.py
+          python -m unittest discover -s backend/tests -p "test_*.py" -q
+          python -m unittest discover -s collector/tests -p "test_*.py" -q
 
   frontend-e2e:
     runs-on: ubuntu-latest

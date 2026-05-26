@@ -36,9 +36,9 @@ def parse_hall_info(html: str) -> dict[str, Any]:
 
     m_p = re.search(r"パチンコ\s*(\d+)\s*台", text)
     m_s = re.search(r"パチスロ|スロット\s*(\d+)\s*台", text)
-    if m_p:
+    if m_p and m_p.group(1):
         info["pachinko_count"] = int(m_p.group(1))
-    if m_s:
+    if m_s and m_s.group(1):
         info["slot_count"] = int(m_s.group(1))
 
     for a in soup.find_all("a", href=True):

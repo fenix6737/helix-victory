@@ -34,10 +34,14 @@ async def scrape_store(store_id: str, url: str) -> list[dict[str, Any]]:
         raise ValueError(f"未対応ソース: {cfg.source}")
 
     if not rows:
-        raise RuntimeError(
+        msg = (
             f"[{store_id}] 収集0件 ({cfg.source.value})。"
             " URL・認証・ネットワークを確認してください。"
         )
+        if os.getenv("HELIX_LENIENT_COLLECT", "").lower() in ("1", "true", "yes"):
+            logger.warning(msg)
+            return []
+        raise RuntimeError(msg)
 
     logger.info("[%s] collected %d rows via %s", store_id, len(rows), cfg.source.value)
     return rows

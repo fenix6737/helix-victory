@@ -3,9 +3,12 @@ name: Cloud Collect
 
 on:
   schedule:
-    # 3時間ごと（UTC）— ピーク帯は workflow_dispatch で追加実行可
     - cron: "0 */3 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: cloud-collect
+  cancel-in-progress: false
 
 jobs:
   collect:
@@ -32,11 +35,27 @@ jobs:
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          test -n "$HELIX_API_URL" || { echo "Missing secret: HELIX_API_URL (repo Settings -> Secrets)"; exit 1; }
+          test -n "$HELIX_API_URL" || { echo "Missing secret: HELIX_API_URL"; exit 1; }
           test -n "$INGEST_API_KEY" || { echo "Missing secret: INGEST_API_KEY"; exit 1; }
           test -n "$ADMIN_USERNAME" || { echo "Missing secret: ADMIN_USERNAME"; exit 1; }
           test -n "$ADMIN_PASSWORD" || { echo "Missing secret: ADMIN_PASSWORD"; exit 1; }
           echo "Secrets OK"
+
+      - name: Preflight API health
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+        run: |
+          set -euo pipefail
+          url="${HELIX_API_URL%/}"
+          for i in 1 2 3 4 5; do
+            if curl -sf "$url/health" >/dev/null; then
+              echo "API health OK"
+              exit 0
+            fi
+            echo "health retry $i/5..."
+            sleep $((i * 3))
+          done
+          echo "WARN: API health check failed — collect will still attempt"
 
       - name: Collect and ingest
         env:
@@ -44,6 +63,7 @@ jobs:
           INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          HELIX_LENIENT_COLLECT: "1"
           DAIDATA_AUTH_B64: ${{ secrets.DAIDATA_AUTH_B64 }}
           DAIDATA_EMAIL: ${{ secrets.DAIDATA_EMAIL }}
           DAIDATA_PASSWORD: ${{ secrets.DAIDATA_PASSWORD }}

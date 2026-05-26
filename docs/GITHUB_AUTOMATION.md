@@ -38,10 +38,25 @@ cd "c:\Helix Victory"
 
 | ファイル | スケジュール | 内容 |
 |----------|--------------|------|
-| `cloud-collect.yml` | 3時間ごと + 手動 | スクレイプ → ingest → 分析 |
+| `cloud-collect.yml` | 3時間ごと + 手動 | スクレイプ → ingest → 分析（部分成功で緑） |
 | `midnight-jst-daily-cycle.yml` | 毎日 00:10 JST | 照合 → 再学習 → 予測レポート |
+| `outcome-verify-jst.yml` | 毎日 01〜03 JST | 実績照合のみ |
+| `secrets-health-check.yml` | 6時間ごと | 認証・ingest キー整合性チェック |
 
-## 手動テスト
+## Fly 再デプロイ後（必須）
+
+`deploy-fly-simple.ps1` は **既存パスワードを保持** し、終了時に GitHub Secrets を自動同期します。  
+手動で直す場合:
+
+```powershell
+.\scripts\sync-github-secrets.ps1
+```
+
+## 落ちにくくする仕組み
+
+- 収集: 1店舗でも成功すれば成功扱い。ソース403/0件は警告のみ
+- API: ログイン・ingest にリトライ（最大4〜5回）
+- 認証ミス（401）だけ赤で止まる（Secrets 未同期）
 
 GitHub → **Actions** → **Cloud Collect** → **Run workflow**
 
