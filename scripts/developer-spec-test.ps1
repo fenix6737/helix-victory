@@ -47,6 +47,9 @@ $required = @(
     "scripts\cloud_collect_once.py",
     ".github\workflows\cloud-collect.yml",
     ".github\workflows\midnight-jst-daily-cycle.yml",
+    ".github\workflows\outcome-verify-jst.yml",
+    "backend\app\analysis\border_ev.py",
+    "backend\app\timeutil.py",
     "docs\DEVELOPER_SPEC.md"
 )
 foreach ($f in $required) {
@@ -69,6 +72,13 @@ Check "§1 anaslo.com" ($anasloSrc -match "ana-slo\.com")
 Check "§1 min-repo tag" ($minrepoSrc -match "min-repo\.com/tag")
 Check "§1 data_sources metadata" ($kiconaSrc -match "data_sources")
 Check "§1 realtime daemon" (Test-Path (Join-Path $Root "collector\collector\daemon.py"))
+
+$engineSrc = Get-Content (Join-Path $Root "backend\app\analysis\engine.py") -Raw -ErrorAction SilentlyContinue
+$feedbackSrc = Get-Content (Join-Path $Root "backend\app\analysis\feedback.py") -Raw -ErrorAction SilentlyContinue
+$anasloParser = Get-Content (Join-Path $Root "collector\collector\anaslo\parser.py") -Raw -ErrorAction SilentlyContinue
+Check "reliability border_ev scoring" ($engineSrc -match "border_ev_score")
+Check "reliability JST outcome window" ($feedbackSrc -match "jst_day_bounds_utc")
+Check "reliability anaslo rotation column" ($anasloParser -match "回転")
 
 # --- ユニットテスト ---
 Push-Location (Join-Path $Root "backend")

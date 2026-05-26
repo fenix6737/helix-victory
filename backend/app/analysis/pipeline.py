@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta, timezone
 
-from app.timeutil import analysis_target_date, jst_now
+from app.timeutil import analysis_target_date, jst_now, jst_today
 
 import pandas as pd
 from sqlalchemy import delete, select, text
@@ -37,7 +37,7 @@ async def run_analysis(
     since = jst_now().astimezone(timezone.utc) - timedelta(days=90)
 
     if run_feedback:
-        await record_outcomes(db, store_id, datetime.now(timezone.utc).date())
+        await record_outcomes(db, store_id, jst_today())
         await adjust_weights(db, store_id)
 
     stmt = (

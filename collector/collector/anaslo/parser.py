@@ -96,6 +96,8 @@ def parse_day_machines(html: str, store_id: str, captured_at: datetime) -> list[
                         header_map["big_count"] = i
                     elif h.upper() == "RB":
                         header_map["reg_count"] = i
+                    elif "回転" in h or h in ("総回", "総回転"):
+                        header_map["rotation_count"] = i
                 continue
 
             if not header_map.get("machine_number") and len(texts) < 4:
@@ -121,7 +123,7 @@ def parse_day_machines(html: str, store_id: str, captured_at: datetime) -> list[
                     "machine_number": machine_number,
                     "title": title,
                     "diff_coins": diff_coins,
-                    "rotation_count": None,
+                    "rotation_count": _parse_int(cell("rotation_count")),
                     "big_count": _parse_int(cell("big_count")),
                     "reg_count": _parse_int(cell("reg_count")),
                     "final_games": _parse_int(cell("final_games")),

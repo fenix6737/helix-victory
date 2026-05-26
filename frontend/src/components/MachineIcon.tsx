@@ -13,7 +13,10 @@ const FONT = { sm: "text-xs", md: "text-sm", lg: "text-base" };
 export function MachineIcon({ title, gameType, size = "md" }: Props) {
   const px = SIZE[size];
   const style = iconStyleFromTitle(title, gameType);
-  const initials = machineInitials(title);
+  const initials = machineInitials(title, gameType);
+  const showTypeBadge =
+    gameType === "slot" ||
+    (gameType === "pachinko" && initials !== "P" && !/^[ぱパ]/.test(initials));
 
   return (
     <div
@@ -27,15 +30,17 @@ export function MachineIcon({ title, gameType, size = "md" }: Props) {
       >
         {initials}
       </span>
-      <span
-        className={`absolute -bottom-1 -right-1 rounded-md px-1 py-0.5 text-[9px] font-bold ${
-          gameType === "pachinko"
-            ? "bg-pink-600 text-white"
-            : "bg-amber-600 text-white"
-        }`}
-      >
-        {gameType === "pachinko" ? "P" : "S"}
-      </span>
+      {showTypeBadge && (
+        <span
+          className={`absolute -bottom-1 -right-1 rounded-md px-1 py-0.5 text-[9px] font-bold ${
+            gameType === "pachinko"
+              ? "bg-pink-600 text-white"
+              : "bg-amber-600 text-white"
+          }`}
+        >
+          {gameType === "pachinko" ? "P" : "S"}
+        </span>
+      )}
     </div>
   );
 }

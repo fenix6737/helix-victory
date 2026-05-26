@@ -101,9 +101,25 @@ export function PeriodStatsPanel({ storeId }: Props) {
             </>
           )}
           <p className="text-amber-200">
-            的中率: {hitPct != null ? `${hitPct}%` : "データ不足"}
+            7日的中率:{" "}
+            {tab === "weekly" && Array.isArray(active.hit_rate_trend)
+              ? (() => {
+                  const trend = active.hit_rate_trend as {
+                    hit_rate_pct: number | null;
+                    evaluated: number;
+                  }[];
+                  const withData = trend.filter((x) => x.evaluated > 0);
+                  if (!withData.length) return "照合データなし（深夜バッチ後に更新）";
+                  const avg =
+                    withData.reduce((s, x) => s + (x.hit_rate_pct ?? 0), 0) / withData.length;
+                  return `${avg.toFixed(1)}%（${withData.length}日分）`;
+                })()
+              : hitPct != null
+                ? `${hitPct}%`
+                : "照合データなし（深夜バッチ後に更新）"}
             {pred.recommend_hit_rate_pct != null &&
               ` / 推奨枠 ${pred.recommend_hit_rate_pct as number}%`}
+            {(pred.evaluated as number) > 0 && ` / 照合 ${pred.evaluated as number}件`}
           </p>
         </div>
       )}

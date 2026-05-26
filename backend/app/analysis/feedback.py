@@ -1,7 +1,7 @@
 """予測→実結果→重み再調整（日次ループ）"""
 
 import json
-from datetime import date, timedelta, timezone
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
@@ -10,27 +10,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.engine import LayerWeights
 from app.models import AnalysisWeights, PredictionOutcome, RawLog, Recommendation
+from app.timeutil import jst_day_bounds_utc, jst_today, outcome_business_date
 
 
 async def record_outcomes(
     db: AsyncSession,
     store_id: str,
-    eval_date: date,
+    eval_date: date | None = None,
 ) -> int:
-    """前日予測と当日実績を比較して保存"""
-    pred_date = eval_date - timedelta(days=1)
+    """
+    終了した営業日の予測と実績を比較して保存。
+
+    - eval_date: 照合実行日（JST、省略時=今日）
+    - 対象予測: target_date == 営業日（eval_date の前日）
+    - 実績ログ: 営業日の JST 0:00〜24:00 に captured された diff_coins
+    """
+    eval_d = eval_date or jst_today()
+    business_day = outcome_business_date(eval_d)
+    since, until = jst_day_bounds_utc(business_day)
+
     recs = await db.execute(
         select(Recommendation).where(
             Recommendation.store_id == store_id,
-            Recommendation.target_date == pred_date,
+            Recommendation.target_date == business_day,
         )
     )
     rec_list = list(recs.scalars().all())
     if not rec_list:
         return 0
-
-    since = pd.Timestamp(eval_date, tz="UTC")
-    until = pd.Timestamp(eval_date + timedelta(days=1), tz="UTC")
 
     count = 0
     for rec in rec_list:
@@ -50,12 +57,23 @@ async def record_outcomes(
         actual_high = actual > 0
         hit = predicted_high == actual_high
 
+        existing = await db.execute(
+            select(PredictionOutcome).where(
+                PredictionOutcome.store_id == store_id,
+                PredictionOutcome.machine_id == rec.machine_id,
+                PredictionOutcome.pred_date == business_day,
+                PredictionOutcome.eval_date == eval_d,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+
         db.add(
             PredictionOutcome(
                 store_id=store_id,
                 machine_id=rec.machine_id,
-                pred_date=pred_date,
-                eval_date=eval_date,
+                pred_date=business_day,
+                eval_date=eval_d,
                 predicted_score=rec.score,
                 predicted_tier=rec.tier,
                 actual_diff_mean=actual,
@@ -70,7 +88,7 @@ async def record_outcomes(
 
 async def adjust_weights(db: AsyncSession, store_id: str) -> LayerWeights:
     """直近14日の的中率からレイヤー重みを微調整"""
-    since = date.today() - timedelta(days=14)
+    since = jst_today() - timedelta(days=14)
     result = await db.execute(
         select(PredictionOutcome).where(
             PredictionOutcome.store_id == store_id,
@@ -92,13 +110,15 @@ async def adjust_weights(db: AsyncSession, store_id: str) -> LayerWeights:
     base.waveform = float(np.clip(base.waveform + delta, 0.7, 1.4))
     base.specific_day = float(np.clip(base.specific_day + delta * 0.8, 0.7, 1.4))
     base.exclusion_penalty = float(np.clip(base.exclusion_penalty + (0.5 - hit_rate) * 0.1, 0.8, 1.3))
+    base.border_ev = float(np.clip(base.border_ev + delta * 0.5, 0.7, 1.4))
+    base.tail_digit = float(np.clip(base.tail_digit + delta * 0.3, 0.7, 1.4))
 
     if row:
         row.weights_json = json.dumps(base.to_dict(), ensure_ascii=False)
         row.hit_rate_14d = hit_rate
         from datetime import datetime as dt
 
-        row.updated_at = dt.now(timezone.utc)
+        row.updated_at = dt.now()
     else:
         db.add(
             AnalysisWeights(

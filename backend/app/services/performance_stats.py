@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Machine, PredictionOutcome, RawLog, Recommendation
 from app.services import live_status
+from app.timeutil import jst_today
 
 
 def _plus_rate(outcomes: list[PredictionOutcome]) -> dict:
@@ -18,17 +19,21 @@ def _plus_rate(outcomes: list[PredictionOutcome]) -> dict:
             "prediction_count": 0,
             "plus_count": 0,
             "plus_rate_pct": None,
+            "hit_rate_pct": None,
             "avg_diff": None,
         }
     plus = sum(1 for o in outcomes if (o.actual_diff_mean or 0) > 0)
+    hits = sum(1 for o in outcomes if o.hit)
     diffs = [o.actual_diff_mean for o in outcomes if o.actual_diff_mean is not None]
     avg = sum(diffs) / len(diffs) if diffs else None
     days = len({o.eval_date for o in outcomes})
+    n = len(outcomes)
     return {
         "sample_days": days,
-        "prediction_count": len(outcomes),
+        "prediction_count": n,
         "plus_count": plus,
-        "plus_rate_pct": round(100.0 * plus / len(outcomes), 1),
+        "plus_rate_pct": round(100.0 * plus / n, 1),
+        "hit_rate_pct": round(100.0 * hits / n, 1),
         "avg_diff": round(avg, 0) if avg is not None else None,
     }
 
@@ -102,8 +107,8 @@ async def get_performance_dashboard(
 ) -> dict:
     from app.analysis.feedback import adjust_weights, record_outcomes
 
-    today = datetime.now(timezone.utc).date()
-    await record_outcomes(db, store_id, today)
+    today = jst_today()
+    recorded = await record_outcomes(db, store_id, today)
     await adjust_weights(db, store_id)
     since_7 = today - timedelta(days=7)
     since_30 = today - timedelta(days=30)
@@ -134,7 +139,8 @@ async def get_performance_dashboard(
         "store_id": store_id,
         "game_type": game_type,
         "generated_at": datetime.now(timezone.utc),
-        "definition": "推奨・保留は「評価日の平均差枚がプラスか」で判定（過去の予測と翌日以降の実績を照合）",
+        "definition": "推奨・保留は「営業日の平均差枚がプラスか」で判定（JST営業日で予測と実績を照合）",
+        "last_reconcile_count": recorded,
         "recommend": {
             "days_7": _plus_rate(rec_7),
             "days_30": _plus_rate(rec_30),

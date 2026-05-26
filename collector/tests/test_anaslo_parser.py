@@ -27,6 +27,19 @@ def test_parse_day():
     assert rows[0]["source"] == "anaslo"
 
 
+def test_parse_rotation_column():
+    html = """
+    <table class="fixed_get_medals_table">
+      <tr><th>台番</th><th>機種</th><th>差枚</th><th>回転</th><th>BB</th></tr>
+      <tr><td>1</td><td>テスト機</td><td>100</td><td>5200</td><td>2</td></tr>
+    </table>
+    """
+    captured = datetime(2026, 5, 20, 4, 0, tzinfo=timezone.utc)
+    rows = parse_day_machines(html, "kicona_amagasaki", captured)
+    assert len(rows) == 1
+    assert rows[0]["rotation_count"] == 5200
+
+
 if __name__ == "__main__":
     test_parse_listing()
     test_parse_day()

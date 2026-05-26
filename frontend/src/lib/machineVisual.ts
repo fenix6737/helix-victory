@@ -8,16 +8,26 @@ export function hashHue(title: string): number {
   return h % 360;
 }
 
-export function machineInitials(title: string): string {
+export function machineInitials(
+  title: string,
+  gameType?: "slot" | "pachinko",
+): string {
   const t = title.trim();
   if (!t) return "?";
+  if (gameType === "pachinko") {
+    const kanji = t.match(/[\u3040-\u9fff\u4e00-\u9fff]/g);
+    if (kanji && kanji.length >= 2) return kanji.slice(0, 2).join("");
+    if (kanji?.[0]) return kanji[0];
+    if (t.startsWith("CR")) return t.length > 2 ? t.slice(2, 4) : "CR";
+    if (/^[PpＰ]/.test(t) && t.length > 2) return t.slice(1, 3);
+  }
   if (t.startsWith("スマスロ")) return "スマ";
   if (t.startsWith("Lパチスロ") || t.startsWith("Lスマ")) return "L";
   if (t.startsWith("L") && t.length > 1) return "L";
   if (t.startsWith("パチスロ")) return "パス";
   if (t.includes("ジャグラー") || t.includes("Juggler")) return "J";
   if (t.startsWith("CR") || t.includes("パチンコ")) return "CR";
-  if (t.startsWith("P")) return "P";
+  if (t.startsWith("P") && gameType !== "pachinko") return "P";
   const m = t.match(/[\u3040-\u9fff\u4e00-\u9fff]/);
   if (m) return m[0];
   return t.slice(0, 2);

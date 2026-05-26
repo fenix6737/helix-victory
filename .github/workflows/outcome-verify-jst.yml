@@ -1,0 +1,30 @@
+# 信頼性極大化 §④ — 深夜 JST 1:00〜4:00 に前日予測の実績照合
+name: Outcome Verify JST (1-4 AM)
+
+on:
+  schedule:
+    # 01:00 / 02:00 / 03:00 JST = 16:00 / 17:00 / 18:00 UTC（前日）
+    - cron: "0 16,17,18 * * *"
+  workflow_dispatch:
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Record outcomes + adjust weights (all stores)
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -e
+          TOKEN=$(curl -sf -X POST "$HELIX_API_URL/api/v1/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          for SID in kicona_amagasaki maruhan_umeda; do
+            echo "=== performance reconcile $SID ==="
+            curl -sf "$HELIX_API_URL/api/v1/stores/$SID/performance?game_type=all" \
+              -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print('outcomes_total', d.get('operations',{}).get('outcomes_total'), 'reconcile', d.get('last_reconcile_count'))"
+          done

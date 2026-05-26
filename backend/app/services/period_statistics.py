@@ -9,13 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.featured import classify_featured
 from app.models import Machine, PredictionOutcome, RawLog, Recommendation
+from app.timeutil import jst_day_bounds_utc, jst_today
 
 
 async def _machines_active_today(
     db: AsyncSession, store_id: str, day: date
 ) -> list[dict]:
-    since = datetime.combine(day, datetime.min.time()).replace(tzinfo=timezone.utc)
-    until = since + timedelta(days=1)
+    since, until = jst_day_bounds_utc(day)
     stmt = (
         select(
             Machine.machine_number,
@@ -85,7 +85,7 @@ async def _prediction_stats(
 async def get_daily_statistics(
     db: AsyncSession, store_id: str, target_date: date | None = None
 ) -> dict:
-    day = target_date or datetime.now(timezone.utc).date()
+    day = target_date or jst_today()
     machines = await _machines_active_today(db, store_id, day)
     pred = await _prediction_stats(db, store_id, day, day)
 
@@ -113,7 +113,7 @@ async def get_daily_statistics(
 async def get_weekly_statistics(
     db: AsyncSession, store_id: str, end_date: date | None = None
 ) -> dict:
-    end = end_date or datetime.now(timezone.utc).date()
+    end = end_date or jst_today()
     start = end - timedelta(days=6)
     pred = await _prediction_stats(db, store_id, start, end)
 
@@ -129,10 +129,8 @@ async def get_weekly_statistics(
             }
         )
 
-    since_dt = datetime.combine(start, datetime.min.time()).replace(tzinfo=timezone.utc)
-    until_dt = datetime.combine(end + timedelta(days=1), datetime.min.time()).replace(
-        tzinfo=timezone.utc
-    )
+    since_dt, _ = jst_day_bounds_utc(start)
+    _, until_dt = jst_day_bounds_utc(end)
     rank_stmt = (
         select(
             Machine.machine_number,
@@ -174,7 +172,7 @@ async def get_weekly_statistics(
 async def get_monthly_statistics(
     db: AsyncSession, store_id: str, year: int | None = None, month: int | None = None
 ) -> dict:
-    now = datetime.now(timezone.utc).date()
+    now = jst_today()
     y = year or now.year
     m = month or now.month
     start = date(y, m, 1)
@@ -185,10 +183,8 @@ async def get_monthly_statistics(
 
     pred = await _prediction_stats(db, store_id, start, end)
 
-    since_dt = datetime.combine(start, datetime.min.time()).replace(tzinfo=timezone.utc)
-    until_dt = datetime.combine(end + timedelta(days=1), datetime.min.time()).replace(
-        tzinfo=timezone.utc
-    )
+    since_dt, _ = jst_day_bounds_utc(start)
+    _, until_dt = jst_day_bounds_utc(end)
     fam_stmt = (
         select(Machine.title, func.count(RawLog.id), func.avg(RawLog.diff_coins))
         .join(Machine, Machine.id == RawLog.machine_id)

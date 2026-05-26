@@ -192,6 +192,7 @@ class PerformanceDashboardOut(BaseModel):
     game_type: str
     generated_at: datetime
     definition: str
+    last_reconcile_count: int = 0
     recommend: TierPerformanceWithTrend
     hold: dict
     operations: PerformanceOperations

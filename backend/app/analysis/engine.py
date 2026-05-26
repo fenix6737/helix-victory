@@ -11,6 +11,7 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
+from app.analysis.border_ev import border_ev_score
 from app.analysis.island import compute_island_stats, enrich_island_column
 from app.config import settings
 from app.game_type import classify_game_type
@@ -47,6 +48,8 @@ class LayerWeights:
     island: float = 1.0
     time_slot: float = 1.0
     exclusion_penalty: float = 1.0
+    border_ev: float = 1.0
+    tail_digit: float = 1.0
 
     @classmethod
     def from_dict(cls, d: dict | None) -> LayerWeights:
@@ -59,6 +62,8 @@ class LayerWeights:
             island=float(d.get("island", 1.0)),
             time_slot=float(d.get("time_slot", 1.0)),
             exclusion_penalty=float(d.get("exclusion_penalty", 1.0)),
+            border_ev=float(d.get("border_ev", 1.0)),
+            tail_digit=float(d.get("tail_digit", 1.0)),
         )
 
     def to_dict(self) -> dict:
@@ -69,6 +74,8 @@ class LayerWeights:
             "island": self.island,
             "time_slot": self.time_slot,
             "exclusion_penalty": self.exclusion_penalty,
+            "border_ev": self.border_ev,
+            "tail_digit": self.tail_digit,
         }
 
 
@@ -317,25 +324,43 @@ def analyze_store(
         specific_day = 1.0 if target_dom in event_days or (target_dom % 10) in event_days or past_match > 0 else 0.0
         island_boost = float(island_row.get("island_release_signal", 0)) if island_row else 0.0
 
+        bev, bev_reasons = border_ev_score(
+            g, mn, str(latest.get("title") or ""), gtype_row, target_date, meta
+        )
+        ocult = settings.ocult_mode
+
         # 加重スコア（モード別補正）
         score = 50.0
-        score += min(sunk_days * 7, 21) * w.specific_day
-        score += is_corner2 * 11 * w.position
-        score += is_corner * 5 * w.position
-        score += island_boost * 14 * w.island
-        score += specific_day * 8 * w.specific_day
-        score += past_match * 12
-        score += (ts["evening_spike"] > 300) * 6 * w.time_slot
-        score += (ts["open_hour_rot"] > 2000) * 4 * w.time_slot
-
-        if wf == WaveformType.RIGHT_SHOULDER:
-            score += 8 * w.waveform
-        elif wf == WaveformType.ONE_SHOT:
-            score += 10 * w.waveform
-        elif wf == WaveformType.RELEASE:
-            score += 7 * w.waveform
-        elif wf == WaveformType.DEATH:
-            score -= 25 * w.waveform
+        if ocult:
+            score += min(sunk_days * 7, 21) * w.specific_day
+            score += is_corner2 * 11 * w.position
+            score += is_corner * 5 * w.position
+            score += island_boost * 14 * w.island
+            score += specific_day * 8 * w.specific_day
+            score += past_match * 12
+            score += (ts["evening_spike"] > 300) * 6 * w.time_slot
+            score += (ts["open_hour_rot"] > 2000) * 4 * w.time_slot
+            if wf == WaveformType.RIGHT_SHOULDER:
+                score += 8 * w.waveform
+            elif wf == WaveformType.ONE_SHOT:
+                score += 10 * w.waveform
+            elif wf == WaveformType.RELEASE:
+                score += 7 * w.waveform
+            elif wf == WaveformType.DEATH:
+                score -= 25 * w.waveform
+        else:
+            # オカルト OFF: 凹み・波形は最大 ~5% 相当、ボーダーEV・末尾・看板を主軸
+            score += min(sunk_days * 0.35, 1.0) * w.specific_day
+            score += is_corner2 * 4 * w.position
+            score += is_corner * 2 * w.position
+            score += island_boost * 5 * w.island
+            score += specific_day * 10 * w.specific_day
+            score += past_match * 6
+            score += bev * 22 * w.border_ev
+            if wf == WaveformType.DEATH:
+                score -= 8 * w.waveform
+            elif wf in (WaveformType.RELEASE, WaveformType.RIGHT_SHOULDER):
+                score += 1.5 * w.waveform
 
         if store_mode == StoreMode.RECOVERY:
             score -= 8
@@ -377,6 +402,8 @@ def analyze_store(
             row, store_mode, island_row, gtype_row, min_samples=min_n
         )
         pos_reasons = _build_positive_reasons(row, store_mode)
+        if not ocult and bev_reasons:
+            pos_reasons = (bev_reasons + pos_reasons)[:6]
         rec_min = settings.score_recommend_min - (4 if gtype_row == "pachinko" else 0)
 
         if excluded:
@@ -405,6 +432,7 @@ def analyze_store(
             {
                 "machine_id": int(machine_id),
                 "score": round(score, 1),
+                "border_ev": round(bev, 3),
                 "tier": tier.value,
                 "reasons": reasons[:6],
                 "sample_count": row["sample_count"],
@@ -420,14 +448,19 @@ def analyze_store(
 
     def _tier_slice(game_type: str, n_rec: int = 20, n_hold: int = 15, n_ex: int = 30) -> list[dict]:
         subset = [r for r in results if r.get("game_type") == game_type]
+        def _sort_key(x: dict) -> tuple:
+            if settings.ocult_mode:
+                return (x["score"], x.get("border_ev", 0))
+            return (x.get("border_ev", 0), x["score"])
+
         recs = sorted(
             [r for r in subset if r["tier"] == VerdictTier.RECOMMEND.value],
-            key=lambda x: x["score"],
+            key=_sort_key,
             reverse=True,
         )
         holds_pool = sorted(
             [r for r in subset if r["tier"] == VerdictTier.HOLD.value],
-            key=lambda x: x["score"],
+            key=_sort_key,
             reverse=True,
         )
         if len(recs) < n_rec and holds_pool:
