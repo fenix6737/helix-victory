@@ -19,3 +19,12 @@
 2026-05-26T10:43:45Z INF ICMP proxy will use 2001:f74:7800:1700:1dfd:9e35:a5d3:1a23 in zone イーサネット as source for IPv6
 2026-05-26T10:43:45Z INF Starting metrics server on 127.0.0.1:20241/metrics
 2026-05-26T10:43:45Z INF Registered tunnel connection connIndex=0 connection=f278017e-54be-4ed7-9bbe-6a0b210048e1 event=0 ip=2606:4700:a0::3 location=kix03 protocol=quic
+2026-05-26T15:26:10Z INF Initiating graceful shutdown due to signal terminated ...
+2026-05-26T15:26:10Z ERR failed to run the datagram handler error="Application error 0x0 (remote)" connIndex=0 event=0 ip=2606:4700:a0::3
+2026-05-26T15:26:10Z ERR failed to serve tunnel connection error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=2606:4700:a0::3
+2026-05-26T15:26:10Z ERR Serve tunnel error error="accept stream listener encountered a failure while serving" connIndex=0 event=0 ip=2606:4700:a0::3
+2026-05-26T15:26:10Z INF Retrying connection in up to 1s connIndex=0 event=0 ip=2606:4700:a0::3
+2026-05-26T15:26:10Z ERR Connection terminated connIndex=0
+2026-05-26T15:26:10Z ERR no more connections active and exiting
+2026-05-26T15:26:10Z INF Tunnel server stopped
+2026-05-26T15:26:10Z INF Metrics server stopped
