@@ -1,0 +1,49 @@
+# Oracle Cloud 無料VM など — 1台で常時稼働（PC不要）
+# 使い方: cp deploy/.env.cloud.example .env.cloud && 編集
+#         docker compose -f deploy/docker-compose.cloud.yml --env-file .env.cloud up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-helix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-helix_victory}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helix -d helix_victory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+
+  helix:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.fly
+    restart: unless-stopped
+    ports:
+      - "${HELIX_HTTP_PORT:-8080}:8080"
+    env_file:
+      - .env.cloud
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-helix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-helix_victory}
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  pgdata:
+  redisdata:

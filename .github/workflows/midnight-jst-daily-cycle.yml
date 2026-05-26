@@ -1,0 +1,33 @@
+# 開発者指示書 §2 — 深夜0時以降（JST）の日次学習サイクル（PC不要・Fly API）
+name: Midnight JST Daily Cycle
+
+on:
+  schedule:
+    # 00:10 JST = 15:10 UTC（前日）
+    - cron: "10 15 * * *"
+  workflow_dispatch:
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Daily learning cycle (all stores)
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -e
+          TOKEN=$(curl -sf -X POST "$HELIX_API_URL/api/v1/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$ADMIN_USERNAME\",\"password\":\"$ADMIN_PASSWORD\"}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          for SID in kicona_amagasaki maruhan_umeda; do
+            echo "=== daily-learning-cycle $SID ==="
+            curl -sf -X POST "$HELIX_API_URL/api/v1/analysis/daily-learning-cycle" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"store_id\":\"$SID\"}"
+            echo ""
+          done

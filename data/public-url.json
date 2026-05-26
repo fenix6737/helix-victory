@@ -1,0 +1,11 @@
+{
+    "updated_at":  "2026-05-26T10:43:57.4222958Z",
+    "mode":  "quick",
+    "source":  "autostart",
+    "public_url":  "https://ideas-genius-cooking-mode.trycloudflare.com",
+    "welcome_url":  "https://ideas-genius-cooking-mode.trycloudflare.com/welcome",
+    "login_url":  "https://ideas-genius-cooking-mode.trycloudflare.com/login",
+    "local_url":  "http://127.0.0.1:3000/welcome",
+    "lan_url":  "http://192.168.0.162:3000/welcome",
+    "note":  "URL changes after each PC reboot. See data/public-url.txt for the latest."
+}

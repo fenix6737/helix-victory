@@ -1,0 +1,34 @@
+# Fly.io — 無料枠で常時稼働（東京リージョン）
+# 初回: fly auth login && fly launch --no-deploy --copy-config
+# デプロイ: fly secrets import < deploy/fly.secrets.example (編集後)
+#          fly deploy
+
+app = "helix-victory"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "deploy/Dockerfile.fly"
+
+[env]
+  PORT = "8080"
+  API_URL_INTERNAL = "http://127.0.0.1:8000"
+  HELIX_COOKIE_SECURE = "1"
+  PUBLIC_ACCESS = "1"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# SQLite 永続化（Neon 不要・登録1つで運用）
+[mounts]
+  source = "helix_data"
+  destination = "/data"

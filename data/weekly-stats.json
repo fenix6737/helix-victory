@@ -1,0 +1,145 @@
+﻿{
+    "store_id":  "kicona_amagasaki",
+    "period":  "weekly",
+    "data":  {
+                 "period":  "weekly",
+                 "start_date":  "2026-05-20",
+                 "end_date":  "2026-05-26",
+                 "store_id":  "kicona_amagasaki",
+                 "prediction":  {
+                                    "evaluated":  0,
+                                    "hits":  0,
+                                    "hit_rate_pct":  null,
+                                    "recommend_hit_rate_pct":  null
+                                },
+                 "hit_rate_trend":  [
+                                        {
+                                            "date":  "2026-05-20",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-21",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-22",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-23",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-24",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-25",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        },
+                                        {
+                                            "date":  "2026-05-26",
+                                            "hit_rate_pct":  null,
+                                            "evaluated":  0
+                                        }
+                                    ],
+                 "machine_ranking":  [
+                                         {
+                                             "machine_number":  199,
+                                             "title":  "P ã¢ãºã¼ã«ã¬ã¼ã³ THE ANIMATION ç°æ¬¡å\u0085ããªã¬ã¼",
+                                             "diff_sum":  53870,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  359,
+                                             "title":  "eã±ã¡ããæ¼å¿!çªé· æ¼¢ã®é ",
+                                             "diff_sum":  40690,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  336,
+                                             "title":  "e æ±äº¬å°ç¨®",
+                                             "diff_sum":  33290,
+                                             "is_featured":  true
+                                         },
+                                         {
+                                             "machine_number":  275,
+                                             "title":  "e æ°ä¸ç´ã¨ã´ã¡ã³ã²ãªãªã³ ï½ã¯ãã¾ãã®è¨æ¶ï½",
+                                             "diff_sum":  31490,
+                                             "is_featured":  true
+                                         },
+                                         {
+                                             "machine_number":  143,
+                                             "title":  "P Re:ã¼ã­ããå§ããç°ä¸ççæ´» é¬¼ããã 199ver.",
+                                             "diff_sum":  30650,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  116,
+                                             "title":  "Pé»éã¡ãã¾å¯¿éç¡ 99ver.",
+                                             "diff_sum":  30250,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  458,
+                                             "title":  "ãããªã¨2",
+                                             "diff_sum":  29330,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  218,
+                                             "title":  "P Re:ã¼ã­ããå§ããç°ä¸ççæ´» é¬¼ãããver.",
+                                             "diff_sum":  27390,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  77,
+                                             "title":  "eGODZILLA7 TYPEâCRASH",
+                                             "diff_sum":  26580,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  352,
+                                             "title":  "e ãã¼ã²ã¼ã ã»ãã¼ã©ã¤ã 199Ver.",
+                                             "diff_sum":  25870,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  383,
+                                             "title":  "ã¹ãã¼ãã±ã¡ãã ã½ã¼ãã¢ã¼ãã»ãªã³ã©ã¤ã³",
+                                             "diff_sum":  24180,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  19,
+                                             "title":  "PAå¤§æµ·ç©èª5ãã©ãã¯LT99ver.",
+                                             "diff_sum":  23800,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  326,
+                                             "title":  "eFãã«ã¼ã­ãã¯",
+                                             "diff_sum":  23360,
+                                             "is_featured":  false
+                                         },
+                                         {
+                                             "machine_number":  344,
+                                             "title":  "e æ±äº¬å°ç¨®",
+                                             "diff_sum":  21460,
+                                             "is_featured":  true
+                                         },
+                                         {
+                                             "machine_number":  245,
+                                             "title":  "Pã¾ã³ãã©ã³ããµã¬",
+                                             "diff_sum":  20800,
+                                             "is_featured":  false
+                                         }
+                                     ]
+             }
+}

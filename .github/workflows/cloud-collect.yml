@@ -1,0 +1,44 @@
+# クラウドAPI向け — PC不要で定期データ収集（GitHub Actions 無料枠）
+name: Cloud Collect
+
+on:
+  schedule:
+    # 3時間ごと（UTC）— ピーク帯は workflow_dispatch で追加実行可
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install collector
+        run: |
+          pip install -r collector/requirements.txt
+          pip install httpx python-dotenv
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Collect and ingest
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          DAIDATA_AUTH_B64: ${{ secrets.DAIDATA_AUTH_B64 }}
+          DAIDATA_EMAIL: ${{ secrets.DAIDATA_EMAIL }}
+          DAIDATA_PASSWORD: ${{ secrets.DAIDATA_PASSWORD }}
+          MARUHAN_UMEDA_URL: https://daidata.goraggio.com/207042
+          ANASLO_KICONA_LIST_URL: https://ana-slo.com/%E3%83%9B%E3%83%BC%E3%83%AB%E3%83%87%E3%83%BC%E3%82%BF/%E5%85%B5%E5%BA%AB%E7%9C%8C/%E3%82%AD%E3%82%B3%E3%83%BC%E3%83%8A%E5%B0%BC%E5%B4%8E%E6%9C%AC%E5%BA%97-%E3%83%87%E3%83%BC%E3%82%BF%E4%B8%80%E8%A6%A7/
+          MINREPO_TAG_URL: https://min-repo.com/tag/%e3%82%ad%e3%82%b3%e3%83%bc%e3%83%8a%e5%b0%bc%e5%b4%8e%e6%9c%ac%e5%ba%97/
+          MINREPO_LATEST_REPORT_URL: https://min-repo.com/3093761/
+          PSCUBE_KICONA_URL: https://www.pscube.jp/dedamajyoho-P-townDMMpachi/c713842/
+          HALLNAVI_KICONA_URL: https://hall-navi.com/hole_view?hid=660088400000027290
+          API_URL: ${{ secrets.HELIX_API_URL }}
+        run: python scripts/cloud_collect_once.py

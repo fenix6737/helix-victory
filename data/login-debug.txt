@@ -1,0 +1,2 @@
+﻿{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJoZWxpeF9hZG1pbiIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc3OTg4NTUwOX0.QSRD45CNLQntGZbjDbXIDbHGe3ki1EI6bz4-tYIiyx0","token_type":"bearer","expires_hours":24}
+HTTP:200

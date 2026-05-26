@@ -1,0 +1,85 @@
+name: Helix Victory CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: helix
+          POSTGRES_PASSWORD: helix
+          POSTGRES_DB: helix_victory
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helix -d helix_victory"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Start API
+        env:
+          DATABASE_URL: postgresql+asyncpg://helix:helix@localhost:5432/helix_victory
+          REDIS_URL: redis://localhost:6379/0
+          ADMIN_USERNAME: helix_admin
+          ADMIN_PASSWORD: HelixVictory2026!Admin
+          JWT_SECRET: ci-test-secret-minimum-32-characters-long
+          INGEST_API_KEY: helix-ingest-ci-key
+        run: |
+          cd backend
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          sleep 8
+          curl -sf http://127.0.0.1:8000/health
+      - name: Seed and test
+        env:
+          API_URL: http://127.0.0.1:8000
+          DATABASE_URL: postgresql+asyncpg://helix:helix@localhost:5432/helix_victory
+          ADMIN_USERNAME: helix_admin
+          ADMIN_PASSWORD: HelixVictory2026!Admin
+          INGEST_API_KEY: helix-ingest-ci-key
+        run: |
+          pip install httpx pandas
+          python scripts/e2e_local.py --store kicona_amagasaki --from-cache
+          python scripts/run_all_tests.py
+
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    needs: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: E2E mobile (smoke)
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+          E2E_USER: helix_admin
+          E2E_PASS: HelixVictory2026!Admin
+        run: npx playwright test --project=iphone --grep "combat panel"
+        continue-on-error: true

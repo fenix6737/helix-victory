@@ -1,0 +1,32 @@
+﻿{
+    "finished_at":  "2026-05-25T22:29:51.5921988+09:00",
+    "pass":  true,
+    "targets":  {
+                    "api_health":  {
+                                       "success_pct":  100,
+                                       "ok":  600,
+                                       "p95_ms":  2481.8,
+                                       "fail":  0,
+                                       "total":  600
+                                   },
+                    "ui_welcome":  {
+                                       "success_pct":  100,
+                                       "ok":  600,
+                                       "p95_ms":  194.7,
+                                       "fail":  0,
+                                       "total":  600
+                                   },
+                    "api_combat":  {
+                                       "success_pct":  100,
+                                       "ok":  600,
+                                       "p95_ms":  4716.7,
+                                       "fail":  0,
+                                       "total":  600
+                                   }
+                },
+    "requests_per_worker":  30,
+    "started_at":  "2026-05-25T22:25:35.1157711+09:00",
+    "total_requests":  1800,
+    "concurrent":  20,
+    "slo":  "each target success_pct \u003e= 99"
+}
