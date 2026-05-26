@@ -110,8 +110,10 @@ function Ensure-GhAuth {
 }
 
 function Set-GhSecrets {
-    param([string]$GhExe, [hashtable]$Vars)
-    Write-Step "Registering GitHub Actions secrets"
+    param([string]$GhExe, [hashtable]$Vars, [string]$RepoSlug)
+    Write-Step "Registering GitHub Actions secrets on $RepoSlug"
+    $repoArg = @()
+    if ($RepoSlug) { $repoArg = @("--repo", $RepoSlug) }
     $map = @{
         HELIX_API_URL  = $Vars["HELIX_PUBLIC_URL"]
         INGEST_API_KEY = $Vars["INGEST_API_KEY"]
@@ -119,7 +121,7 @@ function Set-GhSecrets {
         ADMIN_PASSWORD = $Vars["ADMIN_PASSWORD"]
     }
     foreach ($pair in $map.GetEnumerator()) {
-        & $GhExe secret set $pair.Key --body $pair.Value | Out-Null
+        & $GhExe secret set $pair.Key --body $pair.Value @repoArg | Out-Null
         Write-Host "  secret: $($pair.Key)" -ForegroundColor Green
     }
 
@@ -178,7 +180,13 @@ if (-not $SkipPush) {
 }
 
 if (-not $SkipSecrets) {
-    Set-GhSecrets -GhExe $ghExe -Vars $vars
+    $repoSlug = ""
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    $login = (& $ghExe api user -q .login 2>$null)
+    $ErrorActionPreference = $prev
+    if ($login) { $repoSlug = "$login/$RepoName" }
+    Set-GhSecrets -GhExe $ghExe -Vars $vars -RepoSlug $repoSlug
 }
 
 Write-Step "Enable workflows (manual run)"

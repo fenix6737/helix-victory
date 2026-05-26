@@ -55,8 +55,24 @@ if (-not $exists) {
     if ($LASTEXITCODE -ne 0) { throw "git push failed (exit $LASTEXITCODE)" }
 }
 
+Write-Host "Registering Actions secrets ..." -ForegroundColor Cyan
+$envFile = Join-Path $Root "deploy\fly-deployed.local.env"
+if (Test-Path $envFile) {
+    $vars = @{}
+    Get-Content $envFile -Encoding UTF8 | ForEach-Object {
+        if ($_ -match '^([^#=]+)=(.*)$') { $vars[$matches[1].Trim()] = $matches[2].Trim() }
+    }
+    if ($vars["HELIX_PUBLIC_URL"]) {
+        & $gh secret set HELIX_API_URL --body $vars["HELIX_PUBLIC_URL"] --repo "$user/$repo" | Out-Null
+        & $gh secret set INGEST_API_KEY --body $vars["INGEST_API_KEY"] --repo "$user/$repo" | Out-Null
+        & $gh secret set ADMIN_USERNAME --body $vars["ADMIN_USERNAME"] --repo "$user/$repo" | Out-Null
+        & $gh secret set ADMIN_PASSWORD --body $vars["ADMIN_PASSWORD"] --repo "$user/$repo" | Out-Null
+        Write-Host "  secrets updated on $user/$repo" -ForegroundColor Green
+    }
+}
+
 Write-Host "Triggering Cloud Collect ..." -ForegroundColor Cyan
-& $gh workflow run "Cloud Collect" --repo "$user/$repo"
+& $gh workflow run "cloud-collect.yml" --repo "$user/$repo"
 Write-Host ""
 Write-Host "Done:" -ForegroundColor Green
 Write-Host "  https://github.com/$user/$repo/actions" -ForegroundColor White

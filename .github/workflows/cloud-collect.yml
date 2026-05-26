@@ -25,6 +25,19 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
+      - name: Verify secrets
+        env:
+          HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          test -n "$HELIX_API_URL" || { echo "Missing secret: HELIX_API_URL (repo Settings -> Secrets)"; exit 1; }
+          test -n "$INGEST_API_KEY" || { echo "Missing secret: INGEST_API_KEY"; exit 1; }
+          test -n "$ADMIN_USERNAME" || { echo "Missing secret: ADMIN_USERNAME"; exit 1; }
+          test -n "$ADMIN_PASSWORD" || { echo "Missing secret: ADMIN_PASSWORD"; exit 1; }
+          echo "Secrets OK"
+
       - name: Collect and ingest
         env:
           HELIX_API_URL: ${{ secrets.HELIX_API_URL }}
