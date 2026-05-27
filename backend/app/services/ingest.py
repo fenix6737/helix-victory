@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game_type import classify_game_type
 from app.models import Machine, RawLog
+from app.store_layout import get_machine_position
 from app.schemas import RawLogIngestItem
 
 
@@ -23,6 +24,8 @@ async def upsert_machine(
     machine = result.scalar_one_or_none()
 
     gtype = game_type or classify_game_type(title)
+    if not position_type:
+        position_type = get_machine_position(store_id, machine_number)
 
     if machine:
         machine.title = title

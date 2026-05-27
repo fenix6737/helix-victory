@@ -78,7 +78,9 @@ async def get_today_recommendations(
         reasons = json.loads(r.reasons) if r.reasons.startswith("[") else [r.reasons]
         m = r.machine
         gtype = getattr(m, "game_type", None) or classify_game_type(m.title)
-        pos = m.position_type or infer_position(m.machine_number, m.island_id)
+        pos = m.position_type or infer_position(
+            m.machine_number, m.island_id, store_id
+        )
         inv = predict_investment(
             title=m.title,
             game_type=gtype,
@@ -160,8 +162,8 @@ async def get_today_recommendations(
 
 
 def _finalize_list(items: list[RecommendationItem], limit: int) -> list[RecommendationItem]:
-    """ゲーム種別フィルタ後に台番号順・連番ランクを付け直す"""
-    ordered = sorted(items, key=lambda x: x.machine_number)
+    """スコア順（rank）を維持したまま表示用連番のみ付け直す"""
+    ordered = sorted(items, key=lambda x: x.rank)
     out: list[RecommendationItem] = []
     for i, item in enumerate(ordered[:limit], start=1):
         out.append(item.model_copy(update={"rank": i}))

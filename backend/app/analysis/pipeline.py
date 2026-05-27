@@ -127,10 +127,17 @@ async def run_analysis(
         tier = item.get("tier", "exclude")
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
 
-        if item.get("island_id"):
+        if item.get("island_id") or item.get("machine_id"):
             machine = await db.get(Machine, item["machine_id"])
-            if machine and not machine.island_id:
-                machine.island_id = item["island_id"]
+            if machine:
+                if item.get("island_id") and not machine.island_id:
+                    machine.island_id = item["island_id"]
+                if not machine.position_type:
+                    from app.store_layout import get_machine_position
+
+                    pos = get_machine_position(store_id, machine.machine_number)
+                    if pos:
+                        machine.position_type = pos
 
         rec = Recommendation(
             store_id=store_id,

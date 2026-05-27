@@ -116,7 +116,6 @@ function HomeClientInner({
   const prefsHydrated = useRef(false);
   const touchStartX = useRef<number | null>(null);
   const [sheetItem, setSheetItem] = useState<RecommendationItem | null>(null);
-  const [restExpanded, setRestExpanded] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -378,8 +377,7 @@ function HomeClientInner({
     [rawItems, budgetYen, tab]
   );
 
-  const topPick = tab === "recommend" ? items[0] : null;
-  const listRest = tab === "recommend" ? items.slice(1) : items;
+  const displayItems = items;
 
   function onSwipeEnd(clientX: number) {
     if (touchStartX.current == null) return;
@@ -448,6 +446,9 @@ function HomeClientInner({
           lastAnalysis={formatTime(live?.last_analysis_at)}
           generatedAt={listUpdated ?? undefined}
           pollingSec={pollSec}
+          ingestAgeMin={live?.ingest_age_minutes}
+          analysisAgeMin={live?.analysis_age_minutes}
+          isAnalysisStale={live?.is_analysis_stale}
         />
 
         <DensityToggle />
@@ -619,50 +620,35 @@ function HomeClientInner({
         </div>
       )}
 
-      {!noStoreData && tab === "recommend" && !isSimple && (
+      {!noStoreData && tab === "recommend" && !isSimple && data.recommend.length > 0 && (
         <FeaturedMachinesSection items={data.recommend} />
       )}
 
-      {!noStoreData && topPick && (
-        <section className="sticky top-[calc(env(safe-area-inset-top)+11rem)] z-20 border-b border-helix-border bg-helix-bg/95 backdrop-blur-sm">
-          <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-amber-300/90">
-            いち推し
-          </p>
-          <RecommendationCard item={topPick} pulse={pulse} />
-        </section>
-      )}
-
-      {!noStoreData && listRest.length > 0 && (
+      {!noStoreData && displayItems.length > 0 && (
         <section>
-          {tab === "recommend" && listRest.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setRestExpanded((v) => !v)}
-              className="flex w-full items-center justify-between px-4 py-2 text-xs font-bold text-helix-muted"
-            >
-              <span>2位以降（{listRest.length}台）</span>
-              <span>{restExpanded ? "▲" : "▼"}</span>
-            </button>
+          {tab === "recommend" && (
+            <p className="border-b border-helix-border/60 px-4 py-2 text-xs font-semibold text-amber-200/90">
+              推奨 {displayItems.length}台（おすすめ度順）
+            </p>
           )}
-          {(tab !== "recommend" || restExpanded) &&
-            listRest.map((item, i) =>
-              isSimple || tab !== "recommend" ? (
-                <RecommendationRow
-                  key={item.machine_id}
-                  item={item}
-                  onSelect={setSheetItem}
-                  showTier={tab !== "recommend"}
-                  compact={isSimple}
-                />
-              ) : (
-                <RecommendationCard
-                  key={item.machine_id}
-                  item={item}
-                  showTier={false}
-                  pulse={pulse && i < 2}
-                />
-              )
-            )}
+          {displayItems.map((item, i) =>
+            isSimple || tab !== "recommend" ? (
+              <RecommendationRow
+                key={item.machine_id}
+                item={item}
+                onSelect={setSheetItem}
+                showTier={tab !== "recommend"}
+                compact={isSimple}
+              />
+            ) : (
+              <RecommendationCard
+                key={item.machine_id}
+                item={item}
+                showTier={tab !== "recommend"}
+                pulse={pulse && tab === "recommend" && i < 3}
+              />
+            )
+          )}
         </section>
       )}
 

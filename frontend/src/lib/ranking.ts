@@ -8,6 +8,6 @@ export function applyBudgetAndRank(
 ): RecommendationItem[] {
   const filtered = filterByBudget(items, budgetYen);
   return filtered
-    .sort((a, b) => a.machine_number - b.machine_number)
+    .sort((a, b) => a.rank - b.rank)
     .map((item, i) => ({ ...item, rank: i + 1 }));
 }

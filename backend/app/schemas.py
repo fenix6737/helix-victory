@@ -304,6 +304,10 @@ class PlayRecordOut(BaseModel):
 
 
 class StoreLiveStatusOut(BaseModel):
+    ingest_age_minutes: int | None = None
+    analysis_age_minutes: int | None = None
+    is_analysis_stale: bool = False
+    realtime_mode: str = "collect_then_analyze"
     store_id: str
     last_ingest_at: datetime | None
     last_analysis_at: datetime | None
@@ -378,6 +382,9 @@ class RawLogIngestRequest(BaseModel):
 class IngestResult(BaseModel):
     inserted: int
     skipped: int
+    analysis_ran: bool = False
+    recommendations_created: int | None = None
+    tier_counts: dict[str, int] | None = None
 
 
 class AnalysisRunRequest(BaseModel):

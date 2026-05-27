@@ -122,15 +122,14 @@ def classify_waveform(g: pd.DataFrame) -> WaveformType:
     return WaveformType.UNKNOWN
 
 
-def infer_position(machine_number: int, island_id: str | None) -> str:
-    tail = machine_number % 10
-    if tail in (1, 2):
-        return "corner2"
-    if tail in (0, 9):
-        return "corner"
-    if tail in (5, 6):
-        return "main_aisle"
-    return "row"
+def infer_position(
+    machine_number: int,
+    island_id: str | None = None,
+    store_id: str | None = None,
+) -> str:
+    from app.store_layout import infer_position_with_store
+
+    return infer_position_with_store(machine_number, island_id, store_id)
 
 
 def _time_slot_features(g: pd.DataFrame) -> dict[str, float]:
@@ -293,7 +292,7 @@ def analyze_store(
         island_id = latest.get("island_id")
         island_row = island_map.get(str(island_id)) if pd.notna(island_id) else None
 
-        pos = latest.get("position_type") or infer_position(mn, island_id)
+        pos = latest.get("position_type") or infer_position(mn, island_id, store_id)
         is_corner = 1 if pos in ("corner", "corner2") else 0
         is_corner2 = 1 if pos == "corner2" else 0
 

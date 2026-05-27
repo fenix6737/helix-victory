@@ -333,8 +333,23 @@ async def post_ingest_logs(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(require_admin_or_ingest_key),
 ):
+    import os
+
     inserted, skipped = await ingest.ingest_logs(db, body.store_id, body.logs)
-    return IngestResult(inserted=inserted, skipped=skipped)
+    analysis_summary: dict | None = None
+    if inserted > 0 and os.getenv("AUTO_ANALYSIS_ON_INGEST", "1") == "1":
+        analysis_summary = await run_analysis(
+            db, body.store_id, run_feedback=False
+        )
+    return IngestResult(
+        inserted=inserted,
+        skipped=skipped,
+        analysis_ran=analysis_summary is not None,
+        recommendations_created=(
+            analysis_summary.get("recommendations_created") if analysis_summary else None
+        ),
+        tier_counts=analysis_summary.get("tier_counts") if analysis_summary else None,
+    )
 
 
 @router.post("/analysis/run")

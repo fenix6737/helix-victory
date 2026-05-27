@@ -158,6 +158,10 @@ export type LiveStatus = {
   poll_interval_sec: number;
   is_stale: boolean;
   has_any_data: boolean;
+  ingest_age_minutes?: number | null;
+  analysis_age_minutes?: number | null;
+  is_analysis_stale?: boolean;
+  realtime_mode?: string;
 };
 
 export type CollectorHealth = {
