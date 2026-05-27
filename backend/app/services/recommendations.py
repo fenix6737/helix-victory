@@ -92,6 +92,8 @@ async def get_today_recommendations(
         )
         feat, fgid, fbadge = classify_featured(m.title)
         bb, rb, atari = log_atari_fields(latest_day_logs.get(r.machine_id))
+        spec_lines = _machine_spec_lines(m.title, gtype)
+        spec_summary = _machine_spec_summary(m.title, gtype)
         return RecommendationItem(
             rank=display_rank,
             machine_id=r.machine_id,
@@ -103,6 +105,8 @@ async def get_today_recommendations(
             is_featured=feat,
             featured_group=fgid,
             featured_badge=fbadge,
+            spec_summary=spec_summary,
+            spec_lines=spec_lines,
             score=round(r.score, 1),
             tier=r.tier or "recommend",
             reasons=reasons,
@@ -340,6 +344,14 @@ def _machine_spec_lines(title: str, game_type: str) -> list[str]:
         else:
             lines.append("タイプ: スマスロ/6.5号機等（名称参照）")
     return lines
+
+
+def _machine_spec_summary(title: str, game_type: str) -> str:
+    lines = _machine_spec_lines(title, game_type)
+    if not lines:
+        return ""
+    parts = [x for x in lines[:2] if x]
+    return " / ".join(parts)
 
 
 def _calc_sunk_days(logs: list[RawLog]) -> int | None:

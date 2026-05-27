@@ -22,6 +22,13 @@ export function RecommendationRow({ item, onSelect, compact, showTier }: Props) 
   const { mode, isDetailed } = useDensity();
   const kind = item.game_type === "pachinko" ? "pachinko" : "slot";
   const slim = compact || mode === "simple";
+  const specTags = [
+    item.game_type === "pachinko" ? "パチンコ" : "スロット",
+    ...(item.spec_summary?.match(/1\/\d{2,4}/) ? [item.spec_summary.match(/1\/\d{2,4}/)![0]] : []),
+    ...(item.spec_summary?.includes("AT") || item.spec_summary?.includes("ART") ? ["AT/ART"] : []),
+    ...(item.spec_summary?.includes("Aタイプ") ? ["Aタイプ"] : []),
+    ...(item.spec_summary?.includes("LT") ? ["LT"] : []),
+  ].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
 
   return (
     <button
@@ -49,6 +56,21 @@ export function RecommendationRow({ item, onSelect, compact, showTier }: Props) 
             {item.expected_investment != null &&
               ` · 目安 ${formatBetYen(item.expected_investment, kind)}`}
           </p>
+        )}
+        {!slim && item.spec_summary && (
+          <p className="mt-0.5 text-[10px] text-sky-200/85">{item.spec_summary}</p>
+        )}
+        {!slim && specTags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {specTags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-sky-400/40 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold text-sky-100"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         )}
         {isDetailed && item.reasons[0] && (
           <p className="mt-1 line-clamp-2 text-[10px] text-helix-muted">{item.reasons[0]}</p>

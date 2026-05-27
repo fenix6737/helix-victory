@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GameKind } from "@/lib/money";
 import { formatYen } from "@/lib/money";
 import { fetchWithGuard } from "@/lib/uiGuardian";
-import { ensureNotifyPermission } from "@/lib/notifications";
+import { ensureNotifyPermission, notifyHotDay } from "@/lib/notifications";
 import type { PlayRecord, StoreExtras } from "@/lib/api";
 
 type Props = {
@@ -21,6 +21,13 @@ const POSTURE_STYLE: Record<string, string> = {
   unknown: "border-helix-border bg-helix-surface text-helix-muted",
 };
 
+const CAL_STYLE: Record<string, string> = {
+  hot: "bg-red-500/35 text-red-100 ring-1 ring-red-300/60",
+  high: "bg-amber-500/30 text-amber-100 ring-1 ring-amber-300/50",
+  neutral: "bg-black/30 text-helix-muted",
+  low: "bg-slate-700/50 text-slate-300",
+};
+
 export function StoreFeaturesPanel({ storeId, storeName, gameKind, refreshKey = 0 }: Props) {
   const [open, setOpen] = useState(true);
   const [extras, setExtras] = useState<StoreExtras | null>(null);
@@ -28,18 +35,38 @@ export function StoreFeaturesPanel({ storeId, storeName, gameKind, refreshKey = 
   const [notifyOn, setNotifyOn] = useState(false);
   const [form, setForm] = useState({ machine_number: "", invest: "", result: "", note: "" });
 
+  const notifyKey = `helix_notify_hot_only:${storeId}`;
+  const lastHotNotifyKey = `helix_last_hot_notified:${storeId}`;
+
   const load = useCallback(async () => {
     const [ex, pr] = await Promise.all([
       fetchWithGuard<StoreExtras>(`/api/proxy/extras?store_id=${storeId}`, {}, { cacheTtlMs: 45_000 }),
       fetchWithGuard<PlayRecord[]>(`/api/proxy/play-records?store_id=${storeId}`, {}, { cacheTtlMs: 15_000 }),
     ]);
-    if (ex.ok) setExtras(ex.data);
+    if (ex.ok) {
+      setExtras(ex.data);
+      if (notifyOn) {
+        const hotToday = ex.data.events.days.find((d) => d.is_target && d.expectancy_level === "hot");
+        if (hotToday) {
+          const last = localStorage.getItem(lastHotNotifyKey);
+          if (last !== hotToday.date) {
+            notifyHotDay(storeName, hotToday.date, hotToday.expectancy_score);
+            localStorage.setItem(lastHotNotifyKey, hotToday.date);
+          }
+        }
+      }
+    }
     if (pr.ok) setRecords(pr.data);
-  }, [storeId]);
+  }, [lastHotNotifyKey, notifyOn, storeId, storeName]);
 
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(notifyKey);
+    if (saved === "1") setNotifyOn(true);
+  }, [notifyKey]);
 
   async function submitRecord(e: React.FormEvent) {
     e.preventDefault();
@@ -79,6 +106,16 @@ export function StoreFeaturesPanel({ storeId, storeName, gameKind, refreshKey = 
 
   const col = extras.collector;
   const trend = extras.trend;
+  const target = extras.events.days.find((d) => d.is_target);
+  const monthTitle = extras.events.target_date.slice(0, 7);
+  const weekDays = ["月", "火", "水", "木", "金", "土", "日"];
+  const lead = extras.events.days.length > 0 ? extras.events.days[0].weekday : 0;
+  const monthCells: Array<typeof extras.events.days[number] | null> = [
+    ...Array.from({ length: lead }, () => null),
+    ...extras.events.days,
+  ];
+  const trail = (7 - (monthCells.length % 7)) % 7;
+  monthCells.push(...Array.from({ length: trail }, () => null));
   const colLevel =
     col.level === "error"
       ? "border-red-500/50 bg-red-950/40 text-red-100"
@@ -122,24 +159,48 @@ export function StoreFeaturesPanel({ storeId, storeName, gameKind, refreshKey = 
           </div>
 
           <div>
-            <p className="text-[10px] text-helix-muted">イベント日（旧イベ・末尾3/9日）</p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {extras.events.days.map((d) => (
-                <span
-                  key={d.date}
-                  className={`rounded px-1.5 py-0.5 text-[10px] tabular-nums ${
-                    d.is_target
-                      ? "bg-amber-500/30 text-amber-100 ring-1 ring-amber-400/50"
-                      : d.is_event_day
-                        ? "bg-pink-500/20 text-pink-200"
-                        : "bg-black/30 text-helix-muted"
-                  }`}
-                >
-                  {d.day}
-                  {d.is_event_day ? "★" : ""}
+            <p className="text-[10px] text-helix-muted">
+              期待値カレンダー（月表示・毎日自動更新）
+            </p>
+            <p className="mt-1 text-xs font-semibold text-amber-100/90">{monthTitle}</p>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {weekDays.map((w) => (
+                <span key={w} className="text-center text-[10px] text-helix-muted">
+                  {w}
                 </span>
               ))}
+              {monthCells.map((d, i) =>
+                d ? (
+                  <span
+                    key={d.date}
+                    className={`rounded px-1.5 py-1 text-center text-[10px] tabular-nums ${
+                      d.is_target
+                        ? "bg-amber-500/30 text-amber-100 ring-1 ring-amber-400/50"
+                        : d.is_event_day
+                          ? `${CAL_STYLE[d.expectancy_level] ?? CAL_STYLE.neutral} font-semibold`
+                          : (CAL_STYLE[d.expectancy_level] ?? CAL_STYLE.neutral)
+                    }`}
+                    title={`${d.date} ${d.label} (${d.expectancy_score})${d.is_event_day ? " / イベント日" : ""}`}
+                  >
+                    {d.day}
+                    {d.is_event_day ? "★" : ""}
+                  </span>
+                ) : (
+                  <span key={`blank-${i}`} className="rounded bg-transparent px-1.5 py-1 text-[10px]">
+                    &nbsp;
+                  </span>
+                )
+              )}
             </div>
+            <p className="mt-1 text-[10px] text-helix-muted">
+              凡例: 激熱/高期待/様子見/低期待（スコアと危険度・推奨件数から算出）
+            </p>
+            {target && (
+              <p className="mt-1 text-[10px] text-amber-100/90">
+                今日: {target.label} ({target.expectancy_score})
+                {target.is_event_day ? " / イベント日★" : ""}
+              </p>
+            )}
           </div>
 
           {extras.islands.length > 0 && (
@@ -177,9 +238,10 @@ export function StoreFeaturesPanel({ storeId, storeName, gameKind, refreshKey = 
                 onClick={async () => {
                   const ok = await ensureNotifyPermission();
                   setNotifyOn(ok);
+                  localStorage.setItem(notifyKey, ok ? "1" : "0");
                 }}
               >
-                {notifyOn ? "通知ON" : "推奨更新を通知"}
+                {notifyOn ? "激熱日だけ通知ON" : "激熱日だけ通知"}
               </button>
             </div>
             <form onSubmit={submitRecord} className="mt-2 grid grid-cols-2 gap-2">

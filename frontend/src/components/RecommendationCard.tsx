@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MachineIcon } from "@/components/MachineIcon";
 import type { RecommendationItem } from "@/lib/api";
@@ -31,6 +32,7 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 export function RecommendationCard({ item, showTier, pulse }: Props) {
+  const [showSpec, setShowSpec] = useState(false);
   const tierClass = TIER_STYLE[item.tier] ?? TIER_STYLE.recommend;
   const isPachinko = item.game_type === "pachinko";
   const kind = isPachinko ? "pachinko" : "slot";
@@ -40,6 +42,18 @@ export function RecommendationCard({ item, showTier, pulse }: Props) {
     item.waveform ?? null,
     kind
   );
+  const specBadges = useMemo(() => {
+    const src = [item.title, ...(item.spec_lines ?? []), item.spec_summary ?? ""].join(" ");
+    const tags = new Set<string>();
+    if (/AT|ART/i.test(src)) tags.add("AT/ART");
+    if (/Aタイプ/.test(src)) tags.add("Aタイプ");
+    if (/\bLT\b/i.test(src)) tags.add("LT");
+    const m = src.match(/1\/\d{2,4}/);
+    if (m) tags.add(m[0]);
+    if (kind === "pachinko") tags.add("パチンコ");
+    else tags.add("スロット");
+    return Array.from(tags).slice(0, 4);
+  }, [item.title, item.spec_lines, item.spec_summary, kind]);
 
   return (
     <Link
@@ -81,6 +95,41 @@ export function RecommendationCard({ item, showTier, pulse }: Props) {
           <p className="mt-0.5 text-[10px] text-amber-200/80">
             {plainIslandShort(item.island_id)} · {plainPosition(item.position_type)}
           </p>
+          {specBadges.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {specBadges.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-sky-400/40 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold text-sky-100"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {item.spec_summary && (
+            <p className="mt-0.5 text-[10px] text-sky-200/85">{item.spec_summary}</p>
+          )}
+          {(item.spec_lines?.length ?? 0) > 0 && (
+            <span
+              onClick={(e) => {
+                e.preventDefault();
+                setShowSpec((v) => !v);
+              }}
+              className="mt-1 inline-block cursor-pointer text-[10px] font-semibold text-sky-300 underline underline-offset-2"
+            >
+              {showSpec ? "スペック詳細を閉じる" : "スペック詳細をタップで展開"}
+            </span>
+          )}
+          {showSpec && (item.spec_lines?.length ?? 0) > 0 && (
+            <ul className="mt-1 space-y-0.5 rounded-md border border-sky-500/30 bg-sky-950/20 px-2 py-1">
+              {item.spec_lines?.map((line, i) => (
+                <li key={i} className="text-[10px] text-sky-100/90">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
           {item.daily_atari_total != null && (
             <p className="mt-1 text-xs font-semibold text-rose-200/95">
               今日の総当たり {item.daily_atari_total}回

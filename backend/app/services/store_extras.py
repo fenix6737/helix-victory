@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.island import compute_island_stats, enrich_island_column
@@ -211,11 +211,70 @@ async def get_event_calendar(db: AsyncSession, store_id: str) -> dict:
         )
         store_mode = rec
 
+    month_start = target.replace(day=1)
+    if month_start.month == 12:
+        next_month = date(month_start.year + 1, 1, 1)
+    else:
+        next_month = date(month_start.year, month_start.month + 1, 1)
+    month_end = next_month - timedelta(days=1)
+
+    start = month_start - timedelta(days=7)
+    end = month_end + timedelta(days=7)
+
+    insight_rows = (
+        await db.execute(
+            select(StoreDailyInsight).where(
+                StoreDailyInsight.store_id == store_id,
+                StoreDailyInsight.target_date >= start,
+                StoreDailyInsight.target_date <= end,
+            )
+        )
+    ).scalars().all()
+    insight_map = {r.target_date: r for r in insight_rows}
+
+    rec_rows = await db.execute(
+        select(
+            Recommendation.target_date,
+            func.sum(case((Recommendation.tier == "recommend", 1), else_=0)).label(
+                "rec_count"
+            ),
+        )
+        .where(
+            Recommendation.store_id == store_id,
+            Recommendation.target_date >= start,
+            Recommendation.target_date <= end,
+        )
+        .group_by(Recommendation.target_date)
+    )
+    rec_map = {d: int(c or 0) for d, c in rec_rows.all()}
+
+    def day_expectancy(d: date, is_event: bool) -> tuple[str, int, str]:
+        score = 50
+        insight_d = insight_map.get(d)
+        rec_cnt = rec_map.get(d, 0)
+        if insight_d:
+            danger = float(insight_d.danger_score or 50)
+            score += int((50 - danger) * 0.7)
+            score += 10 if bool(insight_d.should_play) else -8
+        if rec_cnt:
+            score += min(12, rec_cnt // 2)
+        if is_event:
+            score += 8
+        score = max(0, min(100, score))
+        if score >= 72:
+            return "hot", score, "激熱"
+        if score >= 58:
+            return "high", score, "高期待"
+        if score <= 38:
+            return "low", score, "低期待"
+        return "neutral", score, "様子見"
+
     days = []
-    for offset in range(-6, 8):
-        d = target + timedelta(days=offset)
+    d = month_start
+    while d <= month_end:
         dom = d.day
         is_event = dom in event_days or (dom % 10) in event_days
+        level, score, label = day_expectancy(d, is_event)
         days.append(
             {
                 "date": d.isoformat(),
@@ -223,8 +282,12 @@ async def get_event_calendar(db: AsyncSession, store_id: str) -> dict:
                 "weekday": d.weekday(),
                 "is_event_day": is_event,
                 "is_target": d == target,
+                "expectancy_level": level,
+                "expectancy_score": score,
+                "label": label,
             }
         )
+        d += timedelta(days=1)
 
     return {
         "target_date": target.isoformat(),

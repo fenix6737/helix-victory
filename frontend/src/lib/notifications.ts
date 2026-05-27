@@ -32,3 +32,18 @@ export function notifyRecommendationUpdate(
     /* ignore */
   }
 }
+
+export function notifyHotDay(storeName: string, dateText: string, score: number) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible") return;
+  try {
+    new Notification(`Helix — ${storeName}`, {
+      body: `激熱日です (${dateText}) 期待スコア ${score}`,
+      tag: `helix-hot-${dateText}`,
+      icon: "/favicon.ico",
+    });
+  } catch {
+    /* ignore */
+  }
+}

@@ -48,6 +48,8 @@ export type RecommendationItem = {
   is_featured?: boolean;
   featured_group?: string | null;
   featured_badge?: string | null;
+  spec_summary?: string | null;
+  spec_lines?: string[];
   daily_big_count?: number | null;
   daily_reg_count?: number | null;
   daily_atari_total?: number | null;
@@ -204,6 +206,9 @@ export type EventCalendarDay = {
   weekday: number;
   is_event_day: boolean;
   is_target: boolean;
+  expectancy_level: "hot" | "high" | "neutral" | "low";
+  expectancy_score: number;
+  label: string;
 };
 
 export type StoreExtras = {

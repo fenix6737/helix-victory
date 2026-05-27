@@ -29,6 +29,13 @@ export function MachineBottomSheet({ item, onClose }: Props) {
   if (!item) return null;
 
   const kind = item.game_type === "pachinko" ? "pachinko" : "slot";
+  const specTags = [
+    kind === "pachinko" ? "パチンコ" : "スロット",
+    ...(item.spec_summary?.match(/1\/\d{2,4}/) ? [item.spec_summary.match(/1\/\d{2,4}/)![0]] : []),
+    ...(item.spec_summary?.includes("AT") || item.spec_summary?.includes("ART") ? ["AT/ART"] : []),
+    ...(item.spec_summary?.includes("Aタイプ") ? ["Aタイプ"] : []),
+    ...(item.spec_summary?.includes("LT") ? ["LT"] : []),
+  ].filter((v, i, arr) => arr.indexOf(v) === i).slice(0, 4);
   const whyLine = formatWhyLine(
     item.reasons,
     item.position_type,
@@ -53,6 +60,21 @@ export function MachineBottomSheet({ item, onClose }: Props) {
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold">{item.title}</p>
             <p className="text-sm text-amber-200">{item.machine_number}番 · {item.rank}位</p>
+            {item.spec_summary && (
+              <p className="mt-0.5 text-[10px] text-sky-200/85">{item.spec_summary}</p>
+            )}
+            {specTags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {specTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-sky-400/40 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold text-sky-100"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="mt-1 text-xs text-emerald-200/90">{whyLine}</p>
             <p className="text-[10px] text-helix-muted">
               {plainIslandShort(item.island_id)} · {plainPosition(item.position_type)}

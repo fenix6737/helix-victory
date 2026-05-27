@@ -53,6 +53,8 @@ class RecommendationItem(BaseModel):
     is_featured: bool = False
     featured_group: str | None = None
     featured_badge: str | None = None
+    spec_summary: str | None = None
+    spec_lines: list[str] = []
     daily_big_count: int | None = Field(
         default=None, description="当日BB（最新スナップショット）"
     )
@@ -269,6 +271,9 @@ class EventCalendarDay(BaseModel):
     weekday: int
     is_event_day: bool
     is_target: bool
+    expectancy_level: str = "neutral"
+    expectancy_score: int = 50
+    label: str = "様子見"
 
 
 class EventCalendarOut(BaseModel):
