@@ -52,6 +52,8 @@ $required = @(
     ".github\scripts\helix-auth.sh",
     "backend\app\analysis\border_ev.py",
     "backend\app\timeutil.py",
+    "backend\app\pachinko_segment.py",
+    "frontend\src\lib\density.tsx",
     "docs\DEVELOPER_SPEC.md"
 )
 foreach ($f in $required) {
@@ -83,6 +85,8 @@ $anasloParser = Get-Content (Join-Path $Root "collector\collector\anaslo\parser.
 Check "reliability border_ev scoring" ($engineSrc -match "border_ev_score")
 Check "reliability JST outcome window" ($feedbackSrc -match "jst_day_bounds_utc")
 Check "reliability anaslo rotation column" ($anasloParser -match "回転")
+Check "pachinko 4pachi middle filter" (Test-Path (Join-Path $Root "backend\app\pachinko_segment.py"))
+Check "UI density mode" (Test-Path (Join-Path $Root "frontend\src\lib\density.tsx"))
 
 # --- ユニットテスト ---
 Push-Location (Join-Path $Root "backend")

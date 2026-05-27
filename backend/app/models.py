@@ -78,6 +78,7 @@ class RawLog(Base):
     reg_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     final_games: Mapped[int | None] = mapped_column(Integer, nullable=True)
     graph_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    graph_samples_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_operating: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     source: Mapped[str] = mapped_column(String(32), default="collector")
 

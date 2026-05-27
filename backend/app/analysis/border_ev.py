@@ -15,6 +15,7 @@ from app.analysis.machine_borders import (
     estimate_rotation_per_1000_yen,
     match_border,
 )
+from app.analysis.graph_intraday import parse_graph_samples, refine_rotation_from_intraday
 from app.featured import classify_featured
 
 DEFAULT_SLOT_BORDER = 21.0
@@ -67,6 +68,16 @@ def border_ev_score(
     if spec and total_rot:
         trend = _diff_trend(g)
         rot_per_k, invest = estimate_rotation_per_1000_yen(total_rot, fg_mean, spec, trend)
+        if "graph_samples_json" in g.columns:
+            gs_raw = g["graph_samples_json"].dropna()
+            if not gs_raw.empty:
+                samples = parse_graph_samples(gs_raw.iloc[-1])
+                if samples:
+                    rot_adj, _ = refine_rotation_from_intraday(
+                        samples, total_rot, fg_mean, spec, trend
+                    )
+                    if rot_adj is not None:
+                        rot_per_k = rot_adj
         if rot_per_k is not None:
             part, exceeded = border_exceed_score(rot_per_k, border_k, margin=1.0)
             score += 0.55 * part

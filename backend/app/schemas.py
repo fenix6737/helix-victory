@@ -362,6 +362,7 @@ class RawLogIngestItem(BaseModel):
     reg_count: int | None = None
     final_games: int | None = None
     graph_url: str | None = None
+    graph_samples_json: str | None = None
     is_operating: bool | None = None
     island_id: str | None = None
     position_type: str | None = None

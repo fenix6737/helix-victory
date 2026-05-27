@@ -142,12 +142,22 @@ def parse_all_list_html(
 
             graph = tr.find("img")
             graph_url = graph.get("src") if graph else None
+            graph_samples_json = None
+            if graph_url:
+                try:
+                    from collector.graph_intraday import parse_graph_html, samples_to_json
+
+                    pts = parse_graph_html(graph.get("alt", "") or "")
+                    graph_samples_json = samples_to_json(pts)
+                except Exception:
+                    graph_samples_json = None
 
             rows_out.append(
                 {
                     **row,
                     "captured_at": captured.isoformat(),
                     "graph_url": graph_url,
+                    "graph_samples_json": graph_samples_json,
                     "is_operating": True,
                     "hist_num": hist_num,
                     "source": "daidata",

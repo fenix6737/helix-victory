@@ -81,6 +81,7 @@ async def ingest_logs(
             reg_count=item.reg_count,
             final_games=item.final_games,
             graph_url=item.graph_url,
+            graph_samples_json=item.graph_samples_json,
             is_operating=item.is_operating,
             source=item.source or "collector",
         )

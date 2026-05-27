@@ -8,7 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.featured import classify_featured
+from app.game_type import classify_game_type
 from app.models import Machine, PredictionOutcome, RawLog, Recommendation
+from app.pachinko_segment import pachinko_analysis_eligible
 from app.timeutil import JST, analysis_target_date, jst_day_bounds_utc, jst_today
 
 
@@ -49,7 +51,10 @@ async def _machines_active_today(
     rows = await db.execute(stmt)
     out = []
     for r in rows.all():
-        feat, gid, badge = classify_featured(r.title or "")
+        title = r.title or ""
+        if classify_game_type(title) == "pachinko" and not pachinko_analysis_eligible(title):
+            continue
+        feat, gid, badge = classify_featured(title)
         out.append(
             {
                 "machine_number": r.machine_number,
@@ -168,15 +173,19 @@ async def get_weekly_statistics(
         .limit(15)
     )
     rank_rows = await db.execute(rank_stmt)
-    ranking = [
-        {
-            "machine_number": r.machine_number,
-            "title": r.title,
-            "diff_sum": int(r.diff_sum or 0),
-            "is_featured": classify_featured(r.title or "")[0],
-        }
-        for r in rank_rows.all()
-    ]
+    ranking = []
+    for r in rank_rows.all():
+        title = r.title or ""
+        if classify_game_type(title) == "pachinko" and not pachinko_analysis_eligible(title):
+            continue
+        ranking.append(
+            {
+                "machine_number": r.machine_number,
+                "title": title,
+                "diff_sum": int(r.diff_sum or 0),
+                "is_featured": classify_featured(title)[0],
+            }
+        )
 
     return {
         "period": "weekly",
@@ -218,7 +227,10 @@ async def get_monthly_statistics(
     rows = await db.execute(fam_stmt)
     by_title: dict[str, dict] = {}
     for title, cnt, avg_diff in rows.all():
-        feat, gid, _ = classify_featured(title or "")
+        t = title or ""
+        if classify_game_type(t) == "pachinko" and not pachinko_analysis_eligible(t):
+            continue
+        feat, gid, _ = classify_featured(t)
         key = gid or "other"
         if key not in by_title:
             by_title[key] = {

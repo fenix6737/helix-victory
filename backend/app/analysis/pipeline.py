@@ -50,6 +50,7 @@ async def run_analysis(
             RawLog.big_count,
             RawLog.reg_count,
             RawLog.final_games,
+            RawLog.graph_samples_json,
             RawLog.is_operating,
             Machine.position_type,
             Machine.island_id,
@@ -85,6 +86,7 @@ async def run_analysis(
             "big_count",
             "reg_count",
             "final_games",
+            "graph_samples_json",
             "is_operating",
             "position_type",
             "island_id",
@@ -235,6 +237,7 @@ async def migrate_schema(engine) -> None:
             ev_mode BOOLEAN DEFAULT 1,
             updated_at TIMESTAMP
         )""",
+        "ALTER TABLE raw_logs ADD COLUMN graph_samples_json TEXT",
     ]
     if engine.dialect.name == "sqlite":
         async with engine.begin() as conn:
@@ -304,6 +307,7 @@ async def migrate_schema(engine) -> None:
             ev_mode BOOLEAN DEFAULT TRUE,
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )""",
+        "ALTER TABLE raw_logs ADD COLUMN IF NOT EXISTS graph_samples_json TEXT",
     ]
     async with engine.begin() as conn:
         for sql in statements:

@@ -6,11 +6,19 @@ import { BudgetControl } from "@/components/BudgetControl";
 import { CombatPanel } from "@/components/CombatPanel";
 import { LiveActivityBar } from "@/components/LiveActivityBar";
 import { FeaturedMachinesSection } from "@/components/FeaturedMachinesSection";
+import { AccordionSection } from "@/components/AccordionSection";
+import { DensityToggle } from "@/components/DensityToggle";
+import { DisplaySettingsPanel } from "@/components/DisplaySettingsPanel";
 import { EvModeToggle } from "@/components/EvModeToggle";
+import { MachineBorderAdmin } from "@/components/MachineBorderAdmin";
+import { MachineBottomSheet } from "@/components/MachineBottomSheet";
 import { PerformanceDashboard } from "@/components/PerformanceDashboard";
 import { RecommendAccuracyPanel } from "@/components/RecommendAccuracyPanel";
 import { PeriodStatsPanel } from "@/components/PeriodStatsPanel";
 import { RecommendationCard } from "@/components/RecommendationCard";
+import { RecommendationRow } from "@/components/RecommendationRow";
+import { DensityProvider, useDensity } from "@/lib/density";
+import type { RecommendationItem } from "@/lib/api";
 import { StoreFeaturesPanel } from "@/components/StoreFeaturesPanel";
 import { StoreSwitcher } from "@/components/StoreSwitcher";
 import { notifyRecommendationUpdate } from "@/lib/notifications";
@@ -70,11 +78,20 @@ function hydrateFromStorage(
   if (ins) setters.setInsight(ins);
 }
 
-export function HomeClient({
+export function HomeClient(props: Props) {
+  return (
+    <DensityProvider>
+      <HomeClientInner {...props} />
+    </DensityProvider>
+  );
+}
+
+function HomeClientInner({
   initialStores,
   initialStoreId,
   initialRecommendations,
 }: Props) {
+  const { densityClass, sections, isSimple, isDetailed } = useDensity();
   const router = useRouter();
   const [storeId, setStoreId] = useState(initialStoreId);
   const [gameKind, setGameKind] = useState<GameKind>("slot");
@@ -96,6 +113,9 @@ export function HomeClient({
   });
   const abortRef = useRef<AbortController | null>(null);
   const prefsHydrated = useRef(false);
+  const touchStartX = useRef<number | null>(null);
+  const [sheetItem, setSheetItem] = useState<RecommendationItem | null>(null);
+  const [restExpanded, setRestExpanded] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem(BUDGET_STORAGE_KEY);
@@ -292,6 +312,22 @@ export function HomeClient({
     [rawItems, budgetYen, tab]
   );
 
+  const topPick = tab === "recommend" ? items[0] : null;
+  const listRest = tab === "recommend" ? items.slice(1) : items;
+
+  function onSwipeEnd(clientX: number) {
+    if (touchStartX.current == null) return;
+    const dx = clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(dx) < 56) return;
+    const idx = initialStores.findIndex((s) => s.id === storeId);
+    if (dx < 0 && idx < initialStores.length - 1) {
+      onStoreChange(initialStores[idx + 1].id);
+    } else if (dx > 0 && idx > 0) {
+      onStoreChange(initialStores[idx - 1].id);
+    }
+  }
+
   const formatTime = (iso: string | null | undefined) => {
     if (!iso) return null;
     return new Date(iso).toLocaleTimeString("ja-JP", {
@@ -311,7 +347,13 @@ export function HomeClient({
     initialStores.find((s) => s.id === storeId)?.name ?? data.store_name;
 
   return (
-    <main className="mx-auto max-w-lg pb-8">
+    <main
+      className={`mx-auto max-w-lg pb-8 ${densityClass}`}
+      onTouchStart={(e) => {
+        touchStartX.current = e.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(e) => onSwipeEnd(e.changedTouches[0]?.clientX ?? 0)}
+    >
       <header className="sticky top-0 z-30 border-b border-helix-border bg-helix-bg/95 backdrop-blur-md safe-top">
         <div className="flex items-center justify-between px-4 pt-3">
           <h1 className="bg-gradient-to-r from-blue-400 to-amber-400 bg-clip-text text-title text-transparent">
@@ -336,7 +378,10 @@ export function HomeClient({
           pollingSec={pollSec}
         />
 
-        <p className="px-4 pb-2 text-meta text-helix-muted">
+        <DensityToggle />
+        <DisplaySettingsPanel />
+
+        <p className="px-4 pb-2 text-meta text-helix-muted density-hide-simple">
           {data.store_name} · {data.target_date}
           {listUpdated && <span className="ml-2 text-amber-300/90">更新 {listUpdated}</span>}
         </p>
@@ -403,27 +448,74 @@ export function HomeClient({
         <BudgetControl budgetYen={budgetYen} onChange={setBudgetYen} />
       </header>
 
-      <CombatPanel
-        liveEv={liveEv}
-        fetchError={fetchError}
-        stale={usingCache || offline}
-        gameKind={gameKind}
-      />
+      {sections.combat && (
+        <div className="density-hide-simple">
+          <CombatPanel
+            liveEv={liveEv}
+            fetchError={fetchError}
+            stale={usingCache || offline}
+            gameKind={gameKind}
+          />
+        </div>
+      )}
 
       <EvModeToggle storeId={storeId} />
 
-      <RecommendAccuracyPanel storeId={storeId} gameKind={gameKind} refreshKey={perfTick} />
+      {sections.accuracy && (
+        <AccordionSection
+          id="accuracy"
+          title="推奨精度（期待値モード）"
+          summary="直近7日のプラス率"
+          defaultOpen={false}
+          lazyLoad
+        >
+          <RecommendAccuracyPanel
+            storeId={storeId}
+            gameKind={gameKind}
+            refreshKey={perfTick}
+          />
+        </AccordionSection>
+      )}
 
-      <PerformanceDashboard storeId={storeId} gameKind={gameKind} refreshKey={perfTick} />
+      {sections.stats && (
+        <AccordionSection
+          id="stats-perf"
+          title="実績ダッシュボード"
+          summary="推奨・保留の的中率"
+          defaultOpen={false}
+          lazyLoad
+        >
+          <PerformanceDashboard
+            storeId={storeId}
+            gameKind={gameKind}
+            refreshKey={perfTick}
+          />
+        </AccordionSection>
+      )}
 
-      <PeriodStatsPanel storeId={storeId} />
+      {sections.stats && !isSimple && (
+        <AccordionSection
+          id="stats-period"
+          title="日次・週次・月次統計"
+          defaultOpen={false}
+          lazyLoad
+        >
+          <PeriodStatsPanel storeId={storeId} />
+        </AccordionSection>
+      )}
 
-      <StoreFeaturesPanel
-        storeId={storeId}
-        storeName={storeName}
-        gameKind={gameKind}
-        refreshKey={perfTick}
-      />
+      {isDetailed && <MachineBorderAdmin />}
+
+      {sections.features && (
+        <div className="density-hide-simple">
+          <StoreFeaturesPanel
+            storeId={storeId}
+            storeName={storeName}
+            gameKind={gameKind}
+            refreshKey={perfTick}
+          />
+        </div>
+      )}
 
       {loadingRec && !usingCache && (
         <p className="px-4 py-2 text-center text-meta text-helix-muted animate-pulse">
@@ -455,22 +547,54 @@ export function HomeClient({
         </div>
       )}
 
-      {!noStoreData && tab === "recommend" && (
+      {!noStoreData && tab === "recommend" && !isSimple && (
         <FeaturedMachinesSection items={data.recommend} />
       )}
 
-      {!noStoreData && (
-        <section>
-          {items.map((item, i) => (
-            <RecommendationCard
-              key={item.machine_id}
-              item={item}
-              showTier={tab !== "recommend"}
-              pulse={pulse && i < 3}
-            />
-          ))}
+      {!noStoreData && topPick && (
+        <section className="sticky top-[calc(env(safe-area-inset-top)+11rem)] z-20 border-b border-helix-border bg-helix-bg/95 backdrop-blur-sm">
+          <p className="px-4 pt-2 text-[10px] font-bold uppercase tracking-wide text-amber-300/90">
+            いち推し
+          </p>
+          <RecommendationCard item={topPick} pulse={pulse} />
         </section>
       )}
+
+      {!noStoreData && listRest.length > 0 && (
+        <section>
+          {tab === "recommend" && listRest.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setRestExpanded((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-2 text-xs font-bold text-helix-muted"
+            >
+              <span>2位以降（{listRest.length}台）</span>
+              <span>{restExpanded ? "▲" : "▼"}</span>
+            </button>
+          )}
+          {(tab !== "recommend" || restExpanded) &&
+            listRest.map((item, i) =>
+              isSimple || tab !== "recommend" ? (
+                <RecommendationRow
+                  key={item.machine_id}
+                  item={item}
+                  onSelect={setSheetItem}
+                  showTier={tab !== "recommend"}
+                  compact={isSimple}
+                />
+              ) : (
+                <RecommendationCard
+                  key={item.machine_id}
+                  item={item}
+                  showTier={false}
+                  pulse={pulse && i < 2}
+                />
+              )
+            )}
+        </section>
+      )}
+
+      <MachineBottomSheet item={sheetItem} onClose={() => setSheetItem(null)} />
 
       <footer className="px-4 py-6 text-center text-meta text-helix-muted">
         毎日自動更新 · {pollSec}秒ごとに再取得

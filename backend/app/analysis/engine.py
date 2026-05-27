@@ -17,6 +17,7 @@ from app.analysis.machine_borders import BorderSpec
 from app.analysis.island import compute_island_stats, enrich_island_column
 from app.config import settings
 from app.game_type import classify_game_type
+from app.pachinko_segment import pachinko_analysis_eligible
 
 
 class StoreMode(str, Enum):
@@ -283,6 +284,11 @@ def analyze_store(
     for machine_id, g in df.groupby("machine_id"):
         g = g.sort_values("captured_at")
         latest = g.iloc[-1]
+        title_early = str(latest.get("title") or "")
+        gtype_early = latest.get("game_type") or classify_game_type(title_early)
+        if gtype_early == "pachinko" and not pachinko_analysis_eligible(title_early):
+            continue
+
         mn = int(latest.get("machine_number") or 0)
         island_id = latest.get("island_id")
         island_row = island_map.get(str(island_id)) if pd.notna(island_id) else None
@@ -423,6 +429,27 @@ def analyze_store(
         if excluded:
             tier = VerdictTier.EXCLUDE
             reasons = ex_reasons
+        elif ev_mode:
+            near_border = (
+                rot_per_k is not None
+                and not border_exceeded
+                and bev >= 0.22
+            )
+            if border_exceeded and score >= rec_min - 6:
+                tier = VerdictTier.RECOMMEND
+                reasons = pos_reasons
+            elif near_border or (score >= settings.score_hold_min and bev >= 0.28):
+                tier = VerdictTier.HOLD
+                reasons = pos_reasons + ["・要確認（保留・ボーダー付近）"]
+            elif score >= rec_min and bev >= 0.5:
+                tier = VerdictTier.RECOMMEND
+                reasons = pos_reasons
+            elif score >= settings.score_hold_min:
+                tier = VerdictTier.HOLD
+                reasons = pos_reasons + ["・要確認（保留）"]
+            else:
+                tier = VerdictTier.EXCLUDE
+                reasons = ["・低期待値"] + ex_reasons
         elif score >= rec_min:
             tier = VerdictTier.RECOMMEND
             reasons = pos_reasons
@@ -484,12 +511,22 @@ def analyze_store(
             key=_sort_key,
             reverse=True,
         )
-        if len(recs) < n_rec and holds_pool:
-            need = n_rec - len(recs)
+        min_hold_reserve = 8 if ev_mode else 4
+        min_rec_floor = 6 if ev_mode else 10
+        if not ev_mode and len(recs) < n_rec and holds_pool:
+            need = min(n_rec - len(recs), max(0, len(holds_pool) - min_hold_reserve))
             promoted = holds_pool[:need]
             for r in promoted:
                 r["tier"] = VerdictTier.RECOMMEND.value
                 r["reasons"] = list(r.get("reasons", [])) + ["・期待値繰上（厳選）"]
+            recs = recs + promoted
+            holds_pool = holds_pool[need:]
+        elif ev_mode and len(recs) < min_rec_floor and holds_pool:
+            need = min(min_rec_floor - len(recs), max(0, len(holds_pool) - min_hold_reserve))
+            promoted = holds_pool[:need]
+            for r in promoted:
+                r["tier"] = VerdictTier.RECOMMEND.value
+                r["reasons"] = list(r.get("reasons", [])) + ["・期待値繰上（最低枠）"]
             recs = recs + promoted
             holds_pool = holds_pool[need:]
         recs = recs[:n_rec]
@@ -497,6 +534,18 @@ def analyze_store(
             r["rank"] = i
 
         holds = holds_pool[:n_hold]
+        if len(holds) < min_hold_reserve and len(recs) > min_rec_floor + 2:
+            demote = sorted(recs, key=_sort_key)[:(min_hold_reserve - len(holds))]
+            for r in demote:
+                r["tier"] = VerdictTier.HOLD.value
+                r["reasons"] = list(r.get("reasons", [])) + ["・保留枠確保"]
+            holds = sorted(
+                [r for r in subset if r["tier"] == VerdictTier.HOLD.value],
+                key=_sort_key,
+                reverse=True,
+            )[:n_hold]
+            recs = [r for r in recs if r not in demote]
+
         for i, r in enumerate(holds, 1):
             r["rank"] = 1000 + i
 

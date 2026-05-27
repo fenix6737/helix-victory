@@ -70,6 +70,21 @@ body {
   animation: fade-up 0.35s ease-out both;
 }
 
+/* 表示密度 */
+.is-simple .density-hide-simple {
+  display: none !important;
+}
+.is-simple .density-compact-only {
+  display: block;
+}
+.is-standard .density-detailed-only,
+.is-simple .density-detailed-only {
+  display: none !important;
+}
+.is-detailed .density-detailed-only {
+  display: block;
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
