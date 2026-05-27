@@ -1,8 +1,11 @@
+import json
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game_type import classify_game_type
-from app.models import Machine, RawLog
+from app.models import Machine, RawLog, StoreMetadata
 from app.store_layout import get_machine_position
 from app.schemas import RawLogIngestItem
 
@@ -91,5 +94,22 @@ async def ingest_logs(
         db.add(log)
         inserted += 1
 
+    if inserted:
+        await _touch_store_sync(db, store_id)
     await db.commit()
     return inserted, skipped
+
+
+async def _touch_store_sync(db: AsyncSession, store_id: str) -> None:
+    now = datetime.now(timezone.utc)
+    row = await db.get(StoreMetadata, store_id)
+    if row:
+        row.updated_at = now
+    else:
+        db.add(
+            StoreMetadata(
+                store_id=store_id,
+                metadata_json=json.dumps({"updated_at": now.isoformat()}),
+                updated_at=now,
+            )
+        )

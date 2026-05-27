@@ -5,9 +5,10 @@ import { BUDGET_MAX_YEN, formatYen } from "@/lib/money";
 type Props = {
   budgetYen: number;
   onChange: (yen: number) => void;
+  hiddenCount?: number;
 };
 
-export function BudgetControl({ budgetYen, onChange }: Props) {
+export function BudgetControl({ budgetYen, onChange, hiddenCount = 0 }: Props) {
   return (
     <div className="border-t border-helix-border px-4 py-3">
       <div className="flex items-center justify-between gap-2">
@@ -32,6 +33,9 @@ export function BudgetControl({ budgetYen, onChange }: Props) {
       </div>
       <p className="mt-1 text-[10px] text-helix-muted">
         賭けてよい目安が予算内の台だけ表示（推奨・保留）
+        {hiddenCount > 0 && (
+          <span className="text-amber-300/90"> · 非表示 {hiddenCount}台</span>
+        )}
       </p>
     </div>
   );

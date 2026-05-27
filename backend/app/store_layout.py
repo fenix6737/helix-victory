@@ -1,20 +1,24 @@
 """
 店舗フロア配置 — 台番号から角台・角2を判定（末尾ヒューリスティックの補正）
 
-キコーナ尼崎: 手前島の角付近（L東京喰種 33番付近など）を明示登録。
+キコーナ尼崎: 手前島・e喰種ブロックなど角ゾーンを明示（台番≠当たり回数）。
 """
 
 from __future__ import annotations
 
-# キコーナ尼崎本店 — ユーザー確認・フロア配置に基く角台（随時拡張可）
+# (開始台番, 終了台番, position_type)
+KICONA_AMAGASAKI_ZONES: tuple[tuple[int, int, str], ...] = (
+    (333, 344, "corner"),  # e東京喰種
+    (474, 483, "corner"),  # L東京喰種・手前島
+)
+
+# 個別台番（ゾーン外の角）
 KICONA_AMAGASAKI_POSITIONS: dict[int, str] = {
-    # 手前 L東京喰種ブロック（低番台フロント）
     31: "corner2",
     32: "corner",
-    33: "corner",  # 手前の角 — 喰種33
+    33: "corner",
     34: "corner",
     39: "corner2",
-    # 各百番台ブロックの角（末尾1,2=角2 / 0,9=角）
     101: "corner2",
     102: "corner2",
     109: "corner",
@@ -37,12 +41,21 @@ KICONA_AMAGASAKI_POSITIONS: dict[int, str] = {
     510: "corner",
 }
 
+_STORE_ZONES: dict[str, tuple[tuple[int, int, str], ...]] = {
+    "kicona_amagasaki": KICONA_AMAGASAKI_ZONES,
+}
+
 _STORE_MAP: dict[str, dict[int, str]] = {
     "kicona_amagasaki": KICONA_AMAGASAKI_POSITIONS,
 }
 
 
 def get_machine_position(store_id: str, machine_number: int) -> str | None:
+    zones = _STORE_ZONES.get(store_id)
+    if zones:
+        for lo, hi, pos in zones:
+            if lo <= machine_number <= hi:
+                return pos
     table = _STORE_MAP.get(store_id)
     if not table:
         return None

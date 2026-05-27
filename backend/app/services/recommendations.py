@@ -14,6 +14,7 @@ from app.game_type import classify_game_type, icon_variant
 from app.models import Machine, RawLog, Recommendation, Store
 from app.analysis.engine import infer_position
 from app.analysis.investment_prediction_engine import predict_investment
+from app.services.daily_hits import latest_logs_for_store_day, log_atari_fields
 from app.schemas import MachineDetailOut, RecommendationItem, TimeSeriesPoint, TodayRecommendationsOut
 
 
@@ -73,6 +74,7 @@ async def get_today_recommendations(
 
     machine_ids = [r.machine_id for r in recs]
     week_diffs = await _week_diff_totals(db, machine_ids)
+    latest_day_logs = await latest_logs_for_store_day(db, store_id, target)
 
     def to_item(r: Recommendation, display_rank: int) -> RecommendationItem:
         reasons = json.loads(r.reasons) if r.reasons.startswith("[") else [r.reasons]
@@ -89,6 +91,7 @@ async def get_today_recommendations(
             store_mode=r.store_mode,
         )
         feat, fgid, fbadge = classify_featured(m.title)
+        bb, rb, atari = log_atari_fields(latest_day_logs.get(r.machine_id))
         return RecommendationItem(
             rank=display_rank,
             machine_id=r.machine_id,
@@ -115,6 +118,9 @@ async def get_today_recommendations(
             max_risk_line=inv["max_risk_line"],
             low_risk_zone=inv["low_risk_zone"],
             deep_hole_probability=inv["deep_hole_probability"],
+            daily_big_count=bb,
+            daily_reg_count=rb,
+            daily_atari_total=atari,
         )
 
     all_recommend: list[RecommendationItem] = []
@@ -271,6 +277,8 @@ async def get_machine_detail(db: AsyncSession, machine_id: int) -> MachineDetail
     hold_trend = _calc_hold_trend(logs)
     island_hist = _island_summary(logs, machine.island_id)
     day_aff = _day_affinity_summary(logs)
+    day_logs = await latest_logs_for_store_day(db, machine.store_id, target)
+    bb, rb, atari = log_atari_fields(day_logs.get(machine.id))
 
     out = MachineDetailOut(
         machine_id=machine.id,
@@ -296,6 +304,9 @@ async def get_machine_detail(db: AsyncSession, machine_id: int) -> MachineDetail
         day_affinity=day_aff,
         game_type=gtype,
         spec_lines=spec_lines,
+        daily_big_count=bb,
+        daily_reg_count=rb,
+        daily_atari_total=atari,
     )
     await cache_set(cache_key, out.model_dump(), settings.cache_ttl_stats)
     return out

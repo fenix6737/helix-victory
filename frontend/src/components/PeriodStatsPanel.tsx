@@ -57,7 +57,16 @@ export function PeriodStatsPanel({ storeId, refreshKey = 0 }: Props) {
         <div className="mt-3 space-y-2 text-sm text-helix-text">
           {tab === "daily" && (
             <>
-              <p>稼働台: {(active.machine_count as number) ?? 0} / 大当たり合計: {(active.big_hit_total as number) ?? 0}</p>
+              <p>
+                稼働台: {(active.machine_count as number) ?? 0} / 総当たり合計(BB+RB):{" "}
+                {(active.atari_total_sum as number) ?? (active.big_hit_total as number) ?? 0}
+                {(active.machines_with_atari_data as number) != null && (
+                  <span className="text-helix-muted">
+                    {" "}
+                    （当たりデータ {(active.machines_with_atari_data as number)}台）
+                  </span>
+                )}
+              </p>
               <p>本日の予測台数: {(active.recommendation_count as number) ?? 0}</p>
             </>
           )}

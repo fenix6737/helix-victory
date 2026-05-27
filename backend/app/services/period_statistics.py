@@ -11,6 +11,7 @@ from app.featured import classify_featured
 from app.game_type import classify_game_type
 from app.models import Machine, PredictionOutcome, RawLog, Recommendation
 from app.pachinko_segment import pachinko_analysis_eligible
+from app.services.daily_hits import atari_total, latest_logs_for_store_day
 from app.timeutil import JST, analysis_target_date, jst_day_bounds_utc, jst_today
 
 
@@ -31,13 +32,13 @@ async def _machines_active_today(
     db: AsyncSession, store_id: str, day: date
 ) -> list[dict]:
     since, until = jst_day_bounds_utc(day)
-    stmt = (
+    sample_stmt = (
         select(
+            Machine.id,
             Machine.machine_number,
             Machine.title,
             func.count(RawLog.id).label("samples"),
             func.sum(RawLog.diff_coins).label("diff_sum"),
-            func.sum(RawLog.big_count).label("bb_sum"),
         )
         .join(Machine, Machine.id == RawLog.machine_id)
         .where(
@@ -46,27 +47,35 @@ async def _machines_active_today(
             RawLog.captured_at < until,
         )
         .group_by(Machine.id, Machine.machine_number, Machine.title)
-        .order_by(func.sum(RawLog.diff_coins).desc())
     )
-    rows = await db.execute(stmt)
+    rows = await db.execute(sample_stmt)
+    latest = await latest_logs_for_store_day(db, store_id, day)
     out = []
     for r in rows.all():
         title = r.title or ""
         if classify_game_type(title) == "pachinko" and not pachinko_analysis_eligible(title):
             continue
         feat, gid, badge = classify_featured(title)
+        log = latest.get(r.id)
+        bb = log.big_count if log else None
+        rb = log.reg_count if log else None
+        total = atari_total(bb, rb)
         out.append(
             {
                 "machine_number": r.machine_number,
                 "title": r.title,
                 "samples": int(r.samples or 0),
                 "diff_sum": int(r.diff_sum or 0),
-                "big_hits": int(r.bb_sum or 0),
+                "big_count": bb,
+                "reg_count": rb,
+                "atari_total": total,
+                "big_hits": total if total is not None else 0,
                 "is_featured": feat,
                 "featured_group": gid,
                 "featured_badge": badge,
             }
         )
+    out.sort(key=lambda m: (m["atari_total"] is None, -(m["atari_total"] or 0), -m["diff_sum"]))
     return out
 
 
@@ -122,12 +131,15 @@ async def get_daily_statistics(
     rec_count = int((await db.execute(rec_stmt)).scalar() or 0)
 
     big_total = sum(m["big_hits"] for m in machines)
+    with_atari = [m for m in machines if m.get("atari_total") is not None]
     return {
         "period": "daily",
         "date": day.isoformat(),
         "store_id": store_id,
         "machine_count": len(machines),
         "big_hit_total": big_total,
+        "atari_total_sum": big_total,
+        "machines_with_atari_data": len(with_atari),
         "recommendation_count": rec_count,
         "prediction": pred,
         "top_machines": machines[:20],

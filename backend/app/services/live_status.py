@@ -4,8 +4,12 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Machine, RawLog, Recommendation
+from app.models import Machine, RawLog, Recommendation, StoreMetadata
 from app.schemas import StoreLiveStatusOut
+
+
+def _utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
 async def get_store_live_status(db: AsyncSession, store_id: str) -> StoreLiveStatusOut:
@@ -17,6 +21,9 @@ async def get_store_live_status(db: AsyncSession, store_id: str) -> StoreLiveSta
     last_analysis = await db.scalar(
         select(func.max(Recommendation.created_at)).where(Recommendation.store_id == store_id)
     )
+    meta_row = await db.get(StoreMetadata, store_id)
+    last_sync = meta_row.updated_at if meta_row else None
+
     log_count = await db.scalar(
         select(func.count(RawLog.id)).where(
             RawLog.store_id == store_id,
@@ -35,17 +42,22 @@ async def get_store_live_status(db: AsyncSession, store_id: str) -> StoreLiveSta
     now = datetime.now(timezone.utc)
     is_stale = True
     ingest_age_min: int | None = None
+    sync_age_min: int | None = None
     analysis_age_min: int | None = None
+
     if last_ingest:
-        li = last_ingest.replace(tzinfo=timezone.utc) if last_ingest.tzinfo is None else last_ingest
-        age = now - li
-        ingest_age_min = int(age.total_seconds() // 60)
-        is_stale = age > timedelta(minutes=stale_minutes)
+        ingest_age_min = int((now - _utc(last_ingest)).total_seconds() // 60)
+
+    if last_sync:
+        sync_age_min = int((now - _utc(last_sync)).total_seconds() // 60)
+        is_stale = (now - _utc(last_sync)) > timedelta(minutes=stale_minutes)
+    elif last_ingest:
+        is_stale = (now - _utc(last_ingest)) > timedelta(minutes=stale_minutes)
+
     is_analysis_stale = True
     if last_analysis:
-        la = last_analysis.replace(tzinfo=timezone.utc) if last_analysis.tzinfo is None else last_analysis
-        analysis_age_min = int((now - la).total_seconds() // 60)
-        is_analysis_stale = (now - la) > timedelta(minutes=analysis_stale_minutes)
+        analysis_age_min = int((now - _utc(last_analysis)).total_seconds() // 60)
+        is_analysis_stale = (now - _utc(last_analysis)) > timedelta(minutes=analysis_stale_minutes)
 
     collect_peak = os.getenv("COLLECTOR_INTERVAL_PEAK_SEC", "45")
     collect_normal = os.getenv("COLLECTOR_INTERVAL_NORMAL_SEC", "180")
@@ -53,6 +65,7 @@ async def get_store_live_status(db: AsyncSession, store_id: str) -> StoreLiveSta
     return StoreLiveStatusOut(
         store_id=store_id,
         last_ingest_at=last_ingest,
+        last_sync_at=last_sync,
         last_analysis_at=last_analysis,
         log_count_24h=log_count,
         machine_count=len(types),
@@ -62,6 +75,7 @@ async def get_store_live_status(db: AsyncSession, store_id: str) -> StoreLiveSta
         is_stale=is_stale,
         has_any_data=last_ingest is not None,
         ingest_age_minutes=ingest_age_min,
+        sync_age_minutes=sync_age_min,
         analysis_age_minutes=analysis_age_min,
         is_analysis_stale=is_analysis_stale,
         realtime_mode=(

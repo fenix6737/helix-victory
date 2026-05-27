@@ -61,6 +61,17 @@ export function MachineBottomSheet({ item, onClose }: Props) {
           <p className="text-body">
             おすすめ度 <span className="font-black text-emerald-400">{item.score}</span>
           </p>
+          {item.daily_atari_total != null && (
+            <p className="text-sm font-semibold text-rose-200">
+              今日の総当たり {item.daily_atari_total}回
+              {item.daily_big_count != null && item.daily_reg_count != null && (
+                <span className="font-normal text-helix-muted">
+                  {" "}
+                  (BB {item.daily_big_count} / RB {item.daily_reg_count})
+                </span>
+              )}
+            </p>
+          )}
           {item.week_diff_total != null && (
             <p className="text-sm text-helix-muted">
               7日出玉 {formatWeekDiff(item.week_diff_total, kind)}

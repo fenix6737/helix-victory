@@ -132,12 +132,11 @@ async def run_analysis(
             if machine:
                 if item.get("island_id") and not machine.island_id:
                     machine.island_id = item["island_id"]
-                if not machine.position_type:
-                    from app.store_layout import get_machine_position
+                from app.store_layout import get_machine_position
 
-                    pos = get_machine_position(store_id, machine.machine_number)
-                    if pos:
-                        machine.position_type = pos
+                pos = get_machine_position(store_id, machine.machine_number)
+                if pos:
+                    machine.position_type = pos
 
         rec = Recommendation(
             store_id=store_id,

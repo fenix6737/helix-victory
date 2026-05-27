@@ -71,6 +71,17 @@ export function RecommendationCard({ item, showTier, pulse }: Props) {
           <p className="mt-0.5 text-[10px] text-amber-200/80">
             {plainIslandShort(item.island_id)} · {plainPosition(item.position_type)}
           </p>
+          {item.daily_atari_total != null && (
+            <p className="mt-1 text-xs font-semibold text-rose-200/95">
+              今日の総当たり {item.daily_atari_total}回
+              {item.daily_big_count != null && item.daily_reg_count != null && (
+                <span className="font-normal text-helix-muted">
+                  {" "}
+                  (BB{item.daily_big_count}+RB{item.daily_reg_count})
+                </span>
+              )}
+            </p>
+          )}
           {item.week_diff_total != null && (
             <p className="mt-1 text-xs text-helix-muted">
               7日出玉 {formatWeekDiff(item.week_diff_total, kind)} · タップで詳細

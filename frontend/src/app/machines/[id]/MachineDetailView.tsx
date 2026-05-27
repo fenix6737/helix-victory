@@ -92,6 +92,20 @@ export function MachineDetailView({ machineId }: Props) {
         </div>
       </header>
 
+      {detail.daily_atari_total != null && (
+        <section className="border-b border-helix-border bg-rose-950/20 px-4 py-3">
+          <p className="text-sm font-semibold text-rose-200">今日の総当たり</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-rose-100">
+            {detail.daily_atari_total}回
+          </p>
+          {detail.daily_big_count != null && detail.daily_reg_count != null && (
+            <p className="text-xs text-helix-muted">
+              BB {detail.daily_big_count} + RB {detail.daily_reg_count}（アナスロ等の当日集計）
+            </p>
+          )}
+        </section>
+      )}
+
       <section className="border-b border-helix-border px-4 py-3">
         <p className="text-sm font-semibold text-amber-200">1週間の出玉（差枚合計）</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-helix-accent">

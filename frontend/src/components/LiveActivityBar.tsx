@@ -9,6 +9,7 @@ type Props = {
   generatedAt?: string;
   pollingSec: number;
   ingestAgeMin?: number | null;
+  syncAgeMin?: number | null;
   analysisAgeMin?: number | null;
   isAnalysisStale?: boolean;
 };
@@ -22,6 +23,7 @@ export function LiveActivityBar({
   generatedAt,
   pollingSec,
   ingestAgeMin,
+  syncAgeMin,
   analysisAgeMin,
   isAnalysisStale,
 }: Props) {
@@ -50,8 +52,10 @@ export function LiveActivityBar({
         </p>
         {!offline && !noData && (
           <p className="text-helix-muted">
-            {lastIngest && `収集 ${lastIngest}`}
-            {ingestAgeMin != null && ` (${ingestAgeMin}分前)`}
+            {syncAgeMin != null && `取得 ${syncAgeMin}分前`}
+            {syncAgeMin == null && lastIngest && `収集 ${lastIngest}`}
+            {syncAgeMin == null && ingestAgeMin != null && ` (${ingestAgeMin}分前)`}
+            {syncAgeMin != null && ingestAgeMin != null && ` · データ日 ${ingestAgeMin}分前`}
             {lastAnalysis && ` · 分析 ${lastAnalysis}`}
             {analysisAgeMin != null && ` (${analysisAgeMin}分前)`}
             {isAnalysisStale && " · 分析待ち"}

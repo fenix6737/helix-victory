@@ -378,6 +378,18 @@ function HomeClientInner({
   );
 
   const displayItems = items;
+  const budgetHiddenCount =
+    tab !== "exclude" && budgetYen < BUDGET_MAX_YEN
+      ? rawItems.length - items.length
+      : 0;
+
+  const featuredItems = useMemo(
+    () =>
+      [...data.recommend, ...data.hold, ...data.exclude_preview].filter(
+        (i) => i.is_featured
+      ),
+    [data.recommend, data.hold, data.exclude_preview]
+  );
 
   function onSwipeEnd(clientX: number) {
     if (touchStartX.current == null) return;
@@ -447,6 +459,7 @@ function HomeClientInner({
           generatedAt={listUpdated ?? undefined}
           pollingSec={pollSec}
           ingestAgeMin={live?.ingest_age_minutes}
+          syncAgeMin={live?.sync_age_minutes}
           analysisAgeMin={live?.analysis_age_minutes}
           isAnalysisStale={live?.is_analysis_stale}
         />
@@ -509,16 +522,20 @@ function HomeClientInner({
               {label}
               <span className="ml-1 text-xs opacity-80">
                 {key === "recommend"
-                  ? applyBudgetAndRank(data.recommend, budgetYen).length
+                  ? data.recommend.length
                   : key === "hold"
-                    ? applyBudgetAndRank(data.hold, budgetYen).length
+                    ? data.hold.length
                     : data.exclude_preview.length}
               </span>
             </button>
           ))}
         </div>
 
-        <BudgetControl budgetYen={budgetYen} onChange={setBudgetYen} />
+        <BudgetControl
+          budgetYen={budgetYen}
+          onChange={setBudgetYen}
+          hiddenCount={budgetHiddenCount}
+        />
       </header>
 
       {sections.combat && (
@@ -620,8 +637,15 @@ function HomeClientInner({
         </div>
       )}
 
-      {!noStoreData && tab === "recommend" && !isSimple && data.recommend.length > 0 && (
-        <FeaturedMachinesSection items={data.recommend} />
+      {!noStoreData && tab === "recommend" && !isSimple && featuredItems.length > 0 && (
+        <FeaturedMachinesSection items={featuredItems} />
+      )}
+
+      {!noStoreData && tab === "recommend" && budgetHiddenCount > 0 && (
+        <p className="mx-4 mt-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
+          予算内のみ表示のため {budgetHiddenCount}台を非表示です。全{rawItems.length}
+          台を見るには「今日の予算」を右端（上限なし）にしてください。
+        </p>
       )}
 
       {!noStoreData && displayItems.length > 0 && (

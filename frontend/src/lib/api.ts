@@ -48,6 +48,9 @@ export type RecommendationItem = {
   is_featured?: boolean;
   featured_group?: string | null;
   featured_badge?: string | null;
+  daily_big_count?: number | null;
+  daily_reg_count?: number | null;
+  daily_atari_total?: number | null;
 };
 
 export type LiveEvMachine = {
@@ -159,6 +162,8 @@ export type LiveStatus = {
   is_stale: boolean;
   has_any_data: boolean;
   ingest_age_minutes?: number | null;
+  sync_age_minutes?: number | null;
+  last_sync_at?: string | null;
   analysis_age_minutes?: number | null;
   is_analysis_stale?: boolean;
   realtime_mode?: string;
@@ -277,6 +282,9 @@ export type MachineDetail = {
   day_affinity: string | null;
   game_type: "slot" | "pachinko";
   spec_lines: string[];
+  daily_big_count?: number | null;
+  daily_reg_count?: number | null;
+  daily_atari_total?: number | null;
 };
 
 export async function fetchStores(): Promise<Store[]> {

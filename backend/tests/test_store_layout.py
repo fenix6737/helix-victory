@@ -8,11 +8,14 @@ from app.store_layout import get_machine_position, infer_position_with_store
 
 
 class TestStoreLayout(unittest.TestCase):
-    def test_kicona_machine_33_corner(self):
-        self.assertEqual(get_machine_position("kicona_amagasaki", 33), "corner")
+    def test_kicona_e_ghoul_block_corner(self):
+        self.assertEqual(get_machine_position("kicona_amagasaki", 333), "corner")
 
-    def test_infer_uses_layout(self):
-        pos = infer_position_with_store(33, None, "kicona_amagasaki")
+    def test_kicona_front_l_ghoul_corner(self):
+        self.assertEqual(get_machine_position("kicona_amagasaki", 481), "corner")
+
+    def test_infer_uses_layout_zone(self):
+        pos = infer_position_with_store(481, None, "kicona_amagasaki")
         self.assertEqual(pos, "corner")
 
     def test_tail_fallback(self):

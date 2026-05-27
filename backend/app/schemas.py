@@ -53,6 +53,15 @@ class RecommendationItem(BaseModel):
     is_featured: bool = False
     featured_group: str | None = None
     featured_badge: str | None = None
+    daily_big_count: int | None = Field(
+        default=None, description="当日BB（最新スナップショット）"
+    )
+    daily_reg_count: int | None = Field(
+        default=None, description="当日RB（最新スナップショット）"
+    )
+    daily_atari_total: int | None = Field(
+        default=None, description="当日総当たり BB+RB"
+    )
 
 
 class TodayRecommendationsOut(BaseModel):
@@ -305,11 +314,13 @@ class PlayRecordOut(BaseModel):
 
 class StoreLiveStatusOut(BaseModel):
     ingest_age_minutes: int | None = None
+    sync_age_minutes: int | None = None
     analysis_age_minutes: int | None = None
     is_analysis_stale: bool = False
     realtime_mode: str = "collect_then_analyze"
     store_id: str
     last_ingest_at: datetime | None
+    last_sync_at: datetime | None = None
     last_analysis_at: datetime | None
     log_count_24h: int
     machine_count: int
@@ -354,6 +365,9 @@ class MachineDetailOut(BaseModel):
     day_affinity: str | None = None
     game_type: str = "slot"
     spec_lines: list[str] = []
+    daily_big_count: int | None = None
+    daily_reg_count: int | None = None
+    daily_atari_total: int | None = None
 
 
 class RawLogIngestItem(BaseModel):
