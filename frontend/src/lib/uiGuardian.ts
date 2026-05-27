@@ -1,6 +1,6 @@
 /** UI安定化 — timeout / retry / stale / empty / オフライン */
 
-import { cacheRead, cacheWrite } from "@/lib/offlineCache";
+import { cacheRead, cacheRemove, cacheWrite } from "@/lib/offlineCache";
 
 export type FetchResult<T> =
   | { ok: true; data: T; stale?: boolean; fromCache?: boolean }
@@ -18,14 +18,20 @@ export async function fetchWithGuard<T>(
     retries?: number;
     cacheKey?: string;
     cacheTtlMs?: number;
+    bypassCache?: boolean;
   }
 ): Promise<FetchResult<T>> {
   const online = typeof navigator !== "undefined" ? navigator.onLine : true;
   const timeoutMs = opts?.timeoutMs ?? (online ? DEFAULT_TIMEOUT_MS : 4_000);
   const retries = opts?.retries ?? (online ? MAX_RETRIES : 0);
   const storageKey = opts?.cacheKey;
+  const bypass = opts?.bypassCache === true;
 
-  if (storageKey) {
+  if (storageKey && bypass) {
+    cacheRemove(storageKey);
+  }
+
+  if (storageKey && !bypass) {
     const cached = cacheRead<T>(storageKey, opts?.cacheTtlMs);
     if (cached != null && !online) {
       return { ok: true, data: cached, stale: true, fromCache: true };

@@ -35,6 +35,15 @@ export function cacheWrite<T>(key: string, data: T): void {
   }
 }
 
+export function cacheRemove(key: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(storageKey(key));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function cacheSavedAt(key: string): number | null {
   if (typeof window === "undefined") return null;
   try {

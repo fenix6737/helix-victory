@@ -29,7 +29,8 @@ import {
   saveStorePreference,
 } from "@/lib/preferences";
 import { BUDGET_MAX_YEN } from "@/lib/money";
-import { apiCacheKey, cacheRead, cacheWrite } from "@/lib/offlineCache";
+import { ReloadButton } from "@/components/ReloadButton";
+import { apiCacheKey, cacheRead, cacheRemove, cacheWrite } from "@/lib/offlineCache";
 import { applyBudgetAndRank } from "@/lib/ranking";
 import { fetchWithGuard, LIVE_EV_TIMEOUT_MS } from "@/lib/uiGuardian";
 import type { LiveStatus, Store, StoreInsight, StoreLiveEv, TodayRecommendations } from "@/lib/api";
@@ -116,6 +117,7 @@ function HomeClientInner({
   const touchStartX = useRef<number | null>(null);
   const [sheetItem, setSheetItem] = useState<RecommendationItem | null>(null);
   const [restExpanded, setRestExpanded] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(BUDGET_STORAGE_KEY);
@@ -160,17 +162,23 @@ function HomeClientInner({
   }, [initialStoreId]);
 
   const fetchRecommendations = useCallback(
-    async (id: string, kind: GameKind, signal: AbortSignal, silent: boolean) => {
+    async (
+      id: string,
+      kind: GameKind,
+      signal: AbortSignal,
+      silent: boolean,
+      force = false
+    ) => {
       const key = cacheKey(id, kind);
-      if (!silent && recCache.current[key]) setData(recCache.current[key]);
+      if (!silent && !force && recCache.current[key]) setData(recCache.current[key]);
       if (!silent) {
         setLoadingRec(true);
-        if (recCache.current[key]) setUsingCache(true);
+        if (!force && recCache.current[key]) setUsingCache(true);
       }
       const res = await fetchWithGuard<TodayRecommendations>(
         `/api/proxy/recommendations?store_id=${id}&game_type=${kind}`,
         { signal },
-        { cacheKey: apiCacheKey(`rec:${key}`) }
+        { cacheKey: apiCacheKey(`rec:${key}`), bypassCache: force }
       );
       if (res.ok === false) {
         if (res.error === "unauthorized") {
@@ -209,47 +217,105 @@ function HomeClientInner({
     [router]
   );
 
-  const fetchLive = useCallback(async (id: string, signal: AbortSignal) => {
+  const fetchLive = useCallback(async (id: string, signal: AbortSignal, force = false) => {
     const res = await fetchWithGuard<LiveStatus>(
       `/api/proxy/live-status?store_id=${id}`,
       { signal },
-      { cacheKey: apiCacheKey(`live:${id}`) }
+      { cacheKey: apiCacheKey(`live:${id}`), bypassCache: force }
     );
     if (res.ok) setLive(res.data);
   }, []);
 
-  const fetchLiveEv = useCallback(async (id: string, kind: GameKind, signal: AbortSignal) => {
-    const key = cacheKey(id, kind);
-    const res = await fetchWithGuard<StoreLiveEv>(
-      `/api/proxy/live-ev?store_id=${id}&game_type=${kind}`,
-      { signal },
-      { cacheKey: apiCacheKey(`ev:${key}`), timeoutMs: LIVE_EV_TIMEOUT_MS }
-    );
-    if (res.ok) setLiveEv(res.data);
-  }, []);
+  const fetchLiveEv = useCallback(
+    async (id: string, kind: GameKind, signal: AbortSignal, force = false) => {
+      const key = cacheKey(id, kind);
+      const res = await fetchWithGuard<StoreLiveEv>(
+        `/api/proxy/live-ev?store_id=${id}&game_type=${kind}`,
+        { signal },
+        {
+          cacheKey: apiCacheKey(`ev:${key}`),
+          timeoutMs: LIVE_EV_TIMEOUT_MS,
+          bypassCache: force,
+        }
+      );
+      if (res.ok) setLiveEv(res.data);
+    },
+    []
+  );
 
-  const fetchInsight = useCallback(async (id: string, signal: AbortSignal) => {
+  const fetchInsight = useCallback(async (id: string, signal: AbortSignal, force = false) => {
     const res = await fetchWithGuard<StoreInsight>(
       `/api/proxy/insights?store_id=${id}`,
       { signal },
-      { cacheKey: apiCacheKey(`insight:${id}`) }
+      { cacheKey: apiCacheKey(`insight:${id}`), bypassCache: force }
     );
     if (res.ok) setInsight(res.data);
     else if (res.error === "HTTP 404") setInsight(null);
   }, []);
 
+  const clearStoreClientCache = useCallback((id: string, kind: GameKind) => {
+    const k = cacheKey(id, kind);
+    const other: GameKind = kind === "slot" ? "pachinko" : "slot";
+    cacheRemove(apiCacheKey(`rec:${k}`));
+    cacheRemove(apiCacheKey(`rec:${cacheKey(id, other)}`));
+    cacheRemove(apiCacheKey(`live:${id}`));
+    cacheRemove(apiCacheKey(`ev:${k}`));
+    cacheRemove(apiCacheKey(`ev:${cacheKey(id, other)}`));
+    cacheRemove(apiCacheKey(`insight:${id}`));
+    cacheRemove(`perf:${id}:${kind}`);
+    cacheRemove(`perf:${id}:${other}`);
+    delete recCache.current[k];
+    delete recCache.current[cacheKey(id, other)];
+  }, []);
+
   const fetchAll = useCallback(
-    (id: string, kind: GameKind, silent = false) => {
+    (id: string, kind: GameKind, silent = false, force = false) => {
       abortRef.current?.abort();
       const ac = new AbortController();
       abortRef.current = ac;
-      void fetchRecommendations(id, kind, ac.signal, silent);
-      void fetchLive(id, ac.signal);
-      void fetchInsight(id, ac.signal);
-      void fetchLiveEv(id, kind, ac.signal);
+      void fetchRecommendations(id, kind, ac.signal, silent, force);
+      void fetchLive(id, ac.signal, force);
+      void fetchInsight(id, ac.signal, force);
+      void fetchLiveEv(id, kind, ac.signal, force);
+      return ac;
     },
     [fetchRecommendations, fetchLive, fetchInsight, fetchLiveEv]
   );
+
+  const handleReload = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setFetchError(null);
+    setUsingCache(false);
+    clearStoreClientCache(storeId, gameKind);
+
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const other: GameKind = gameKind === "slot" ? "pachinko" : "slot";
+
+    try {
+      await Promise.all([
+        fetchRecommendations(storeId, gameKind, ac.signal, false, true),
+        fetchLive(storeId, ac.signal, true),
+        fetchInsight(storeId, ac.signal, true),
+        fetchLiveEv(storeId, gameKind, ac.signal, true),
+        fetchRecommendations(storeId, other, ac.signal, true, true),
+      ]);
+      setPerfTick((n) => n + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [
+    refreshing,
+    storeId,
+    gameKind,
+    clearStoreClientCache,
+    fetchRecommendations,
+    fetchLive,
+    fetchInsight,
+    fetchLiveEv,
+  ]);
 
   useEffect(() => {
     hydrateFromStorage(storeId, gameKind, recCache, setters);
@@ -355,22 +421,28 @@ function HomeClientInner({
       onTouchEnd={(e) => onSwipeEnd(e.changedTouches[0]?.clientX ?? 0)}
     >
       <header className="sticky top-0 z-30 border-b border-helix-border bg-helix-bg/95 backdrop-blur-md safe-top">
-        <div className="flex items-center justify-between px-4 pt-3">
+        <div className="flex items-center justify-between gap-2 px-4 pt-3">
           <h1 className="bg-gradient-to-r from-blue-400 to-amber-400 bg-clip-text text-title text-transparent">
             推奨台
           </h1>
-          <button
-            type="button"
-            onClick={logout}
-            className="min-h-tap px-2 text-meta text-helix-muted"
-          >
-            ログアウト
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ReloadButton
+              onReload={() => void handleReload()}
+              loading={refreshing || loadingRec}
+            />
+            <button
+              type="button"
+              onClick={logout}
+              className="min-h-tap px-2 text-meta text-helix-muted"
+            >
+              ログアウト
+            </button>
+          </div>
         </div>
 
         <LiveActivityBar
           offline={offline}
-          isStale={!!live?.is_stale || usingCache}
+          isStale={!!live?.is_stale || (usingCache && !refreshing)}
           noData={!!noStoreData}
           lastIngest={formatTime(live?.last_ingest_at)}
           lastAnalysis={formatTime(live?.last_analysis_at)}
@@ -500,7 +572,7 @@ function HomeClientInner({
           defaultOpen={false}
           lazyLoad
         >
-          <PeriodStatsPanel storeId={storeId} />
+          <PeriodStatsPanel storeId={storeId} refreshKey={perfTick} />
         </AccordionSection>
       )}
 

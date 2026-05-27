@@ -5,9 +5,9 @@ import { fetchWithGuard } from "@/lib/uiGuardian";
 
 type StatsPayload = { store_id: string; period: string; data: Record<string, unknown> };
 
-type Props = { storeId: string };
+type Props = { storeId: string; refreshKey?: number };
 
-export function PeriodStatsPanel({ storeId }: Props) {
+export function PeriodStatsPanel({ storeId, refreshKey = 0 }: Props) {
   const [daily, setDaily] = useState<StatsPayload | null>(null);
   const [weekly, setWeekly] = useState<StatsPayload | null>(null);
   const [monthly, setMonthly] = useState<StatsPayload | null>(null);
@@ -26,7 +26,7 @@ export function PeriodStatsPanel({ storeId }: Props) {
       if (m.ok) setMonthly(m.data);
     })();
     return () => ac.abort();
-  }, [storeId]);
+  }, [storeId, refreshKey]);
 
   const active =
     tab === "daily" ? daily?.data : tab === "weekly" ? weekly?.data : monthly?.data;
