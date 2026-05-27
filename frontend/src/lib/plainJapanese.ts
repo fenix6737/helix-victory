@@ -54,7 +54,7 @@ const PREFIX: [RegExp, string][] = [
   [/^店舗死に位置/, "店で負けやすい位置"],
   [/^回収周期一致/, "回収の周期と一致"],
   [/^据え置き低設定/, "据え置きで低めの設定疑い"],
-  [/^長期未投入島/, "長い間据え置きの島"],
+  [/^長期未投入島/, "長く傾向固定の島"],
   [/^角2配置/, "角2の位置"],
   [/^角配置/, "角台の位置"],
   [/^島全体強化/, "島全体が強め"],
@@ -80,6 +80,21 @@ export function plainText(text: string): string {
     if (re.test(t)) return msg;
   }
   return raw.startsWith("・") ? t : raw;
+}
+
+function normalizeUnitForGame(
+  text: string,
+  gameType?: "slot" | "pachinko" | string | null
+): string {
+  if (gameType !== "pachinko") return text;
+  return text.replace(/([+\-−]?\d[\d,]*)枚/g, "$1玉");
+}
+
+export function plainTextForGame(
+  text: string,
+  gameType?: "slot" | "pachinko" | string | null
+): string {
+  return normalizeUnitForGame(plainText(text), gameType);
 }
 
 export function plainIsland(state: string | undefined): string {
@@ -120,10 +135,13 @@ const WF_SHORT: Record<string, string> = {
 export function formatWhyLine(
   reasons: string[],
   positionType: string | null | undefined,
-  waveform: string | null | undefined
+  waveform: string | null | undefined,
+  gameType?: "slot" | "pachinko" | string | null
 ): string {
   const skip = /不足|欠損|稼働不足|低期待値/;
-  const hit = reasons.map((r) => plainText(r)).find((r) => r && !skip.test(r));
+  const hit = reasons
+    .map((r) => plainTextForGame(r, gameType))
+    .find((r) => r && !skip.test(r));
   if (hit) return hit;
   const parts: string[] = [];
   const pos = plainPosition(positionType);

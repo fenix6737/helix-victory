@@ -91,7 +91,7 @@ def border_ev_score(
         score += 0.35 * part
 
     habit, habit_reasons = lookup_hall_habit_scores(
-        habit_cache, machine_number, island_id
+        habit_cache, machine_number, island_id, game_type=game_type
     )
     score += 0.35 * habit
     reasons.extend(habit_reasons)

@@ -7,7 +7,7 @@ import { MiniChart } from "@/components/MiniChart";
 import type { MachineDetail } from "@/lib/api";
 import { apiCacheKey, cacheRead, cacheWrite } from "@/lib/offlineCache";
 import { formatDiffYen, formatWeekDiff, type GameKind } from "@/lib/money";
-import { plainIslandShort, plainPosition, plainText } from "@/lib/plainJapanese";
+import { plainIslandShort, plainPosition, plainTextForGame } from "@/lib/plainJapanese";
 import { fetchWithGuard } from "@/lib/uiGuardian";
 
 type Props = { machineId: number };
@@ -138,7 +138,7 @@ export function MachineDetailView({ machineId }: Props) {
           <ul className="mt-2 space-y-1">
             {detail.reasons.map((r, i) => (
               <li key={i} className="text-body text-helix-muted">
-                {plainText(r)}
+                {plainTextForGame(r, kind)}
               </li>
             ))}
           </ul>

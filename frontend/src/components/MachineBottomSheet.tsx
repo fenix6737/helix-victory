@@ -4,7 +4,12 @@ import { useEffect } from "react";
 import { MachineIcon } from "@/components/MachineIcon";
 import type { RecommendationItem } from "@/lib/api";
 import { formatBetYen, formatWeekDiff, MONEY_LABEL, rateLabel } from "@/lib/money";
-import { formatWhyLine, plainIslandShort, plainPosition, plainText } from "@/lib/plainJapanese";
+import {
+  formatWhyLine,
+  plainIslandShort,
+  plainPosition,
+  plainTextForGame,
+} from "@/lib/plainJapanese";
 
 type Props = {
   item: RecommendationItem | null;
@@ -24,7 +29,12 @@ export function MachineBottomSheet({ item, onClose }: Props) {
   if (!item) return null;
 
   const kind = item.game_type === "pachinko" ? "pachinko" : "slot";
-  const whyLine = formatWhyLine(item.reasons, item.position_type, item.waveform ?? null);
+  const whyLine = formatWhyLine(
+    item.reasons,
+    item.position_type,
+    item.waveform ?? null,
+    kind
+  );
 
   return (
     <div
@@ -80,7 +90,7 @@ export function MachineBottomSheet({ item, onClose }: Props) {
           <ul className="space-y-1">
             {item.reasons.map((r, i) => (
               <li key={i} className="text-xs text-helix-muted">
-                {plainText(r)}
+                {plainTextForGame(r, kind)}
               </li>
             ))}
           </ul>

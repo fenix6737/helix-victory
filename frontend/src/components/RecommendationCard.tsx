@@ -9,7 +9,12 @@ import {
   MONEY_LABEL,
   rateLabel,
 } from "@/lib/money";
-import { formatWhyLine, plainIslandShort, plainPosition, plainText } from "@/lib/plainJapanese";
+import {
+  formatWhyLine,
+  plainIslandShort,
+  plainPosition,
+  plainTextForGame,
+} from "@/lib/plainJapanese";
 
 type Props = { item: RecommendationItem; showTier?: boolean; pulse?: boolean };
 
@@ -29,7 +34,12 @@ export function RecommendationCard({ item, showTier, pulse }: Props) {
   const tierClass = TIER_STYLE[item.tier] ?? TIER_STYLE.recommend;
   const isPachinko = item.game_type === "pachinko";
   const kind = isPachinko ? "pachinko" : "slot";
-  const whyLine = formatWhyLine(item.reasons, item.position_type, item.waveform ?? null);
+  const whyLine = formatWhyLine(
+    item.reasons,
+    item.position_type,
+    item.waveform ?? null,
+    kind
+  );
 
   return (
     <Link
@@ -94,7 +104,7 @@ export function RecommendationCard({ item, showTier, pulse }: Props) {
           <ul className="mt-2 space-y-0.5">
             {item.reasons.slice(0, 3).map((r, i) => (
               <li key={i} className="text-meta text-helix-muted">
-                {plainText(r)}
+                {plainTextForGame(r, kind)}
               </li>
             ))}
           </ul>

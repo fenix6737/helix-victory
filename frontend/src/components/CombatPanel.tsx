@@ -84,6 +84,7 @@ export function CombatPanel({ liveEv, fetchError, stale, gameKind }: Props) {
   const subline = plainText(liveEv.danger_headline);
   const hint = modeHint(mode);
   const isCritical = liveEv.danger_level === "critical";
+  const isDefenseDay = (liveEv.danger_score ?? 0) >= 50;
   const q = liveEv.quantile;
   const evMain = liveEv.primary?.current_ev;
   const cacheNote =
@@ -159,6 +160,11 @@ export function CombatPanel({ liveEv, fetchError, stale, gameKind }: Props) {
           <span className="ml-1 text-xs text-amber-200/80">（はまり波に注意）</span>
         )}
       </p>
+      {isDefenseDay && (
+        <p className="mt-2 rounded-lg border border-amber-400/60 bg-amber-950/40 px-3 py-2 text-xs font-semibold text-amber-100">
+          危険度が高いため、今日は最上位1台以外は触らない運用を推奨します。
+        </p>
+      )}
 
       <button
         type="button"

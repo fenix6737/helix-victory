@@ -275,7 +275,7 @@ async def get_machine_detail(db: AsyncSession, machine_id: int) -> MachineDetail
 
     sunk_days = _calc_sunk_days(logs)
     hold_trend = _calc_hold_trend(logs)
-    island_hist = _island_summary(logs, machine.island_id)
+    island_hist = _island_summary(logs, machine.island_id, gtype)
     day_aff = _day_affinity_summary(logs)
     day_logs = await latest_logs_for_store_day(db, machine.store_id, target)
     bb, rb, atari = log_atari_fields(day_logs.get(machine.id))
@@ -363,14 +363,17 @@ def _calc_sunk_days(logs: list[RawLog]) -> int | None:
     return sunk if sunk > 0 else None
 
 
-def _island_summary(logs: list[RawLog], island_id: str | None) -> str | None:
+def _island_summary(
+    logs: list[RawLog], island_id: str | None, game_type: str = "slot"
+) -> str | None:
     if not island_id:
         return None
     same = [l for l in logs if l.diff_coins is not None]
     if len(same) < 2:
         return None
     avg = sum(l.diff_coins for l in same if l.diff_coins is not None) / len(same)
-    return f"島{island_id} 直近平均 {int(avg):+d}枚"
+    unit = "玉" if game_type == "pachinko" else "枚"
+    return f"島{island_id} 直近平均 {int(avg):+d}{unit}"
 
 
 def _day_affinity_summary(logs: list[RawLog]) -> str | None:

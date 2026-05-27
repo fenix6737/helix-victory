@@ -77,10 +77,17 @@ def build_hall_habit_cache(
     )
 
 
-def _score_from_avg(avg: float, strong: float, mild: float) -> tuple[float, list[str]]:
+def _unit_label(game_type: str) -> str:
+    return "玉" if game_type == "pachinko" else "枚"
+
+
+def _score_from_avg(
+    avg: float, strong: float, mild: float, *, game_type: str
+) -> tuple[float, list[str]]:
     reasons: list[str] = []
     if avg > strong:
-        return 0.45, [f"・イベント日 平均+{avg:.0f}枚"]
+        unit = _unit_label(game_type)
+        return 0.45, [f"・イベント日 平均+{avg:.0f}{unit}"]
     if avg > mild:
         return 0.25, ["・イベント日 やや強め"]
     if avg > 0:
@@ -92,6 +99,7 @@ def lookup_hall_habit_scores(
     cache: HallHabitCache | None,
     machine_number: int,
     island_id: str | None,
+    game_type: str = "slot",
 ) -> tuple[float, list[str]]:
     if not cache:
         return 0.0, []
@@ -101,7 +109,9 @@ def lookup_hall_habit_scores(
     tail = machine_number % 10
 
     if tail in cache.tail_avg:
-        part, rs = _score_from_avg(cache.tail_avg[tail], 300, 0)
+        part, rs = _score_from_avg(
+            cache.tail_avg[tail], 300, 0, game_type=game_type
+        )
         if part:
             score += part
             reasons.append(f"・イベント日末尾{tail}番" + (rs[0].replace("・イベント日 ", "") if rs else ""))
@@ -116,9 +126,10 @@ def lookup_hall_habit_scores(
             avg_isl = cache.block_avg[block]
 
     if avg_isl is not None:
+        unit = _unit_label(game_type)
         if avg_isl > 400:
             score += 0.4
-            reasons.append(f"・強い島/ブロック 平均+{avg_isl:.0f}枚")
+            reasons.append(f"・強い島/ブロック 平均+{avg_isl:.0f}{unit}")
         elif avg_isl > 0:
             score += 0.2
             reasons.append("・島ブロックややプラス傾向")
@@ -133,7 +144,10 @@ def compute_hall_habit_scores(
     island_id: str | None,
     target_date: date,
     event_days: list[int] | None = None,
+    game_type: str = "slot",
 ) -> tuple[float, list[str]]:
     """後方互換 — 単体テスト用。本番は build_hall_habit_cache + lookup を使用。"""
     cache = build_hall_habit_cache(df, target_date, event_days)
-    return lookup_hall_habit_scores(cache, machine_number, island_id)
+    return lookup_hall_habit_scores(
+        cache, machine_number, island_id, game_type=game_type
+    )
